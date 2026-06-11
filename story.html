@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>道牌斗法：气运争锋 - 剧情模式</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+.step { display: none; }
+.step.active { display: block; }
+.story-text {
+  background: rgba(140,150,130,0.08);
+  border-left: 3px solid rgba(130,150,110,0.5);
+  padding: 18px 20px;
+  margin: 14px 0;
+  line-height: 1.9;
+  font-size: 14px;
+  color: #2f3d36;
+  white-space: pre-line;
+  max-height: 52vh;
+  overflow-y: auto;
+  border-radius: 0 8px 8px 0;
+}
+.selector-row {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin: 14px 0;
+}
+.selector-group {
+  flex: 1;
+  min-width: 140px;
+  text-align: center;
+}
+.selector-group label {
+  display: block;
+  font-size: 13px;
+  font-weight: bold;
+  margin-bottom: 6px;
+  color: #5a6b62;
+}
+.selector-group select {
+  width: 100%;
+  padding: 8px;
+  font-size: 14px;
+  border: 1px solid rgba(140,150,130,0.35);
+  border-radius: 6px;
+  background: rgba(0,0,0,0.04);
+  color: #2f3d36;
+  font-family: inherit;
+}
+.profession-desc {
+  margin: 12px 0;
+  padding: 12px 16px;
+  background: rgba(140,150,130,0.1);
+  border-radius: 8px;
+  font-size: 14px;
+  line-height: 1.7;
+  color: #5a6b62;
+  min-height: 48px;
+}
+.summary-box {
+  background: rgba(140,150,130,0.08);
+  border: 1px solid rgba(140,150,130,0.2);
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin: 12px 0;
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.summary-item { text-align: center; }
+.summary-item .label { font-size: 12px; color: #8a8a78; }
+.summary-item .value { font-size: 16px; font-weight: bold; color: #4a6a4a; }
+.character-name { font-size: 18px; font-weight: bold; color: #4a6a4a; text-align: center; margin: 10px 0; }
+.story-box {
+  background: rgba(140,150,130,0.06);
+  border: 1px solid rgba(140,150,130,0.2);
+  border-radius: 8px;
+  padding: 14px 18px;
+  margin: 10px 0;
+  font-size: 14px;
+  line-height: 1.9;
+  color: #2f3d36;
+  max-height: 40vh;
+  overflow-y: auto;
+}
+.name-input-area { margin: 12px 0; text-align: center; }
+.name-input-area input {
+  width: 220px;
+  padding: 8px 10px;
+  font-size: 15px;
+  border: 1px solid rgba(140,150,130,0.35);
+  border-radius: 6px;
+  background: rgba(0,0,0,0.04);
+  color: #2f3d36;
+  font-family: inherit;
+}
+.nav-buttons { margin-top: 16px; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+.diff-grid {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin: 14px 0;
+}
+.diff-btn {
+  padding: 10px 18px;
+  border: 1px solid rgba(140,150,130,0.35);
+  border-radius: 8px;
+  background: rgba(140,150,130,0.1);
+  color: #2f3d36;
+  font-size: 14px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.diff-btn:hover { background: rgba(140,150,130,0.2); }
+.diff-btn.selected { background: rgba(140,150,130,0.35); border-color: rgba(130,150,110,0.6); color: #4a6a4a; font-weight: bold; }
+</style>
+</head>
+<body>
+
+<div class="page-wrap" style="max-width: 640px;">
+
+  <!-- 步骤0：选择难度 -->
+  <div class="step active" id="step-difficulty">
+    <h2>选择难度</h2>
+    <div class="diff-grid">
+      <button class="diff-btn" data-diff="easy">简单</button>
+      <button class="diff-btn" data-diff="normal">普通</button>
+      <button class="diff-btn" data-diff="hard">困难</button>
+    </div>
+    <p id="diff-desc" style="font-size:13px; color:#5a6b62; line-height:1.7; min-height:60px; text-align:center;"></p>
+    <div class="nav-buttons">
+      <button class="btn-secondary" onclick="goMenu()">返回主选单</button>
+      <button class="btn-primary" id="btn-diff-next" disabled>下一步</button>
+    </div>
+  </div>
+
+  <!-- 步骤1：开篇 -->
+  <div class="step" id="step-prologue">
+    <h2>开篇</h2>
+    <div class="story-text">
+三百年前，仙人绝迹，天地间只剩传说。
+修仙界苟延残喘，灵气日渐稀薄，宗门凋零，功法残缺。人们都说，飞升已是上古旧梦，此界再无通天路。
+
+直到那一天——北荒秘境裂开一道缝隙，一座古老石台从虚空中浮现。
+
+台上刻满密密麻麻的符文，每一笔都在吞噬周围的光线。石台中央，一块玉碑静静矗立，上面只有一行字：
+
+「赌尽一切，气运为注。胜者夺运，败者归墟。最后一人生还，可开天门。」
+
+消息传出，天下震动。
+
+有人嗤之以鼻，说这是魔道陷阱。有人在观望，在犹豫，在恐惧。还有人毫不犹豫地选择站到赌斗台前，对他们来说，这或许是唯一的机会。
+
+他们来自大陆各地，身份各异，修为高低不同。但他们都有一个共同点——
+
+已经没有什么可失去的了。
+
+赌斗，即将开始。
+    </div>
+    <div class="nav-buttons">
+      <button class="btn-secondary" onclick="goMenu()">返回主选单</button>
+      <button class="btn-primary" onclick="showStep('select')">选择你的角色</button>
+    </div>
+  </div>
+
+  <!-- 步骤2：选择角色 -->
+  <div class="step" id="step-select">
+    <h2>选择你的角色</h2>
+    <div class="selector-row">
+      <div class="selector-group">
+        <label>性别</label>
+        <select id="sel-gender"><option value="">-- 请选择 --</option><option value="男">男</option><option value="女">女</option></select>
+      </div>
+      <div class="selector-group">
+        <label>年龄</label>
+        <select id="sel-age">
+          <option value="">-- 请选择 --</option>
+          <option value="少年">少年/少女（十五六岁，初出茅庐）</option>
+          <option value="青年">青年（二十余岁，意气风发）</option>
+          <option value="中年">中年（四五十岁，阅历丰富）</option>
+          <option value="老年">老年（七八十岁，老谋深算）</option>
+        </select>
+      </div>
+      <div class="selector-group">
+        <label>职业</label>
+        <select id="sel-profession"><option value="">-- 请选择 --</option><option value="剑气">剑气</option><option value="丹香">丹香</option><option value="御兽">御兽</option><option value="炼体">炼体</option><option value="巫蛊">巫蛊</option></select>
+      </div>
+    </div>
+    <div class="profession-desc" id="profession-desc">选择职业后，此处将显示该职业的介绍。</div>
+    <div class="nav-buttons">
+      <button class="btn-secondary" onclick="showStep('prologue')">返回上一步</button>
+      <button class="btn-primary" onclick="confirmSelection()">下一步</button>
+      <button class="btn-secondary" onclick="randomSelect()">随机生成</button>
+    </div>
+    <p class="error-msg" id="select-error"></p>
+  </div>
+
+  <!-- 步骤3：角色与背景故事 -->
+  <div class="step" id="step-background">
+    <h2>你的命运</h2>
+    <div class="summary-box">
+      <div class="summary-item"><div class="label">性别</div><div class="value" id="sum-gender"></div></div>
+      <div class="summary-item"><div class="label">年龄</div><div class="value" id="sum-age"></div></div>
+      <div class="summary-item"><div class="label">职业</div><div class="value" id="sum-profession"></div></div>
+    </div>
+    <div class="character-name" id="char-name"></div>
+    <div class="story-box" id="char-story"></div>
+    <div class="nav-buttons">
+      <button class="btn-secondary" onclick="showStep('select')">返回上一步</button>
+      <button class="btn-primary" onclick="showNameStep()">下一步</button>
+      <button class="btn-secondary" onclick="randomAndConfirm()">随机生成</button>
+    </div>
+  </div>
+
+  <!-- 步骤4：赋予姓名 -->
+  <div class="step" id="step-name">
+    <h2>赋予姓名</h2>
+    <div style="text-align:center; margin:10px 0; font-size:14px; color:#5a6b62;">
+      <div id="name-preview" style="font-weight:bold; color:#4a6a4a; margin-bottom:6px;"></div>
+      <div id="name-shortdesc" style="font-size:13px; line-height:1.6;"></div>
+    </div>
+    <p style="text-align:center; font-size:13px; color:#5a6b62;">你可以使用这个角色的原名，也可以为他取一个新的名字。</p>
+    <div class="name-input-area">
+      <input type="text" id="custom-name" placeholder="输入新名字（6个字符以内）" maxlength="6">
+      <button class="btn-secondary" onclick="useCustomName()" style="margin-top:8px; width:auto; padding:8px 18px;">使用此名字</button>
+    </div>
+    <div class="nav-buttons">
+      <button class="btn-secondary" onclick="showStep('background')">返回上一步</button>
+      <button class="btn-primary" onclick="useOriginalName()">就用原名：<span id="original-name-label"></span></button>
+    </div>
+    <p class="error-msg" id="name-error"></p>
+    <p style="margin-top:16px; font-style:italic; color:#8a8a78; text-align:center; font-size:13px;">赌命台上，只有一个人能活着离开。</p>
+  </div>
+
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/storage.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/story-data.js"></script>
+<script>
+let selectedDifficulty = '';
+let selectedGender = '';
+let selectedAge = '';
+let selectedProfession = '';
+let matchedCharacter = null;
+
+const DIFF_DESC = {
+  easy: '简单：适合只想体验故事的新手。',
+  normal: '普通：你的对手都不简单。',
+  hard: '困难：直面你的命运！'
+};
+
+function showStep(id) {
+  document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+  document.getElementById('step-' + id).classList.add('active');
+}
+
+function goMenu() {
+  showConfirm('确认返回', '确认要返回主选单吗？未保存的进度将会遗失', () => {
+    window.location.href = 'menu.html';
+  });
+}
+
+// ===== 难度选择 =====
+document.querySelectorAll('.diff-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.diff-btn').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    selectedDifficulty = btn.dataset.diff;
+    document.getElementById('diff-desc').textContent = DIFF_DESC[selectedDifficulty];
+    document.getElementById('btn-diff-next').disabled = false;
+  });
+});
+
+document.getElementById('btn-diff-next').addEventListener('click', () => {
+  if (!selectedDifficulty) return;
+  showStep('prologue');
+});
+
+// ===== 职业描述 =====
+document.getElementById('sel-profession').addEventListener('change', function() {
+  const desc = PROFESSION_DESC[this.value];
+  document.getElementById('profession-desc').textContent = desc ? (this.value + '：' + desc) : '选择职业后，此处将显示该职业的介绍。';
+});
+
+function randomSelect() {
+  const g = GENDER_OPTIONS[Math.floor(Math.random() * GENDER_OPTIONS.length)];
+  const a = AGE_OPTIONS[Math.floor(Math.random() * AGE_OPTIONS.length)];
+  const p = PROFESSION_OPTIONS[Math.floor(Math.random() * PROFESSION_OPTIONS.length)];
+  document.getElementById('sel-gender').value = g.value;
+  document.getElementById('sel-age').value = a.value;
+  document.getElementById('sel-profession').value = p.value;
+  document.getElementById('sel-profession').dispatchEvent(new Event('change'));
+  document.getElementById('select-error').textContent = '';
+}
+
+function confirmSelection() {
+  const gender = document.getElementById('sel-gender').value;
+  const age = document.getElementById('sel-age').value;
+  const prof = document.getElementById('sel-profession').value;
+  if (!gender || !age || !prof) {
+    document.getElementById('select-error').textContent = '请完整选择性别、年龄和职业';
+    return;
+  }
+  selectedGender = gender;
+  selectedAge = age;
+  selectedProfession = prof;
+  matchedCharacter = findCharacter(gender, age, prof);
+  if (!matchedCharacter) {
+    document.getElementById('select-error').textContent = '没有找到匹配的角色，请调整选择';
+    return;
+  }
+  document.getElementById('select-error').textContent = '';
+  renderCharacter();
+  showStep('background');
+}
+
+function renderCharacter() {
+  document.getElementById('sum-gender').textContent = selectedGender;
+  document.getElementById('sum-age').textContent = selectedAge;
+  document.getElementById('sum-profession').textContent = selectedProfession;
+  document.getElementById('char-name').textContent = matchedCharacter.name;
+  document.getElementById('char-story').textContent = matchedCharacter.story;
+}
+
+function randomAndConfirm() {
+  randomSelect();
+  confirmSelection();
+}
+
+// ===== 取名 =====
+function showNameStep() {
+  document.getElementById('original-name-label').textContent = matchedCharacter.name;
+  document.getElementById('name-preview').textContent = matchedCharacter.name + ' · ' + selectedGender + ' · ' + selectedAge + ' · ' + selectedProfession;
+  document.getElementById('name-shortdesc').textContent = matchedCharacter.story.substring(0, 60) + '……';
+  document.getElementById('custom-name').value = '';
+  document.getElementById('name-error').textContent = '';
+  showStep('name');
+}
+
+function useOriginalName() {
+  startGame(matchedCharacter.name);
+}
+
+function useCustomName() {
+  const name = document.getElementById('custom-name').value.trim();
+  const regex = /^[\u4e00-\u9fa5a-zA-Z0-9]{1,6}$/;
+  if (!regex.test(name)) {
+    document.getElementById('name-error').textContent = '名字仅限6个汉字、英文或数字';
+    return;
+  }
+  startGame(name);
+}
+
+async function startGame(playerName) {
+  const user = getCurrentUser();
+  if (!user) {
+    alert('登录状态已失效，请重新登录。');
+    window.location.href = 'index.html';
+    return;
+  }
+
+  const saveData = {
+    playerName: playerName,
+    gender: selectedGender,
+    age: selectedAge,
+    profession: selectedProfession,
+    characterName: matchedCharacter.name,
+    characterStory: matchedCharacter.story,
+    difficulty: selectedDifficulty,
+    chips: 10000,
+    startChips: 10000,
+    round: 1,
+    totalRounds: 5,
+    status: '牌局间歇',
+    startTime: Date.now(),
+    playDuration: 0,
+    createdAt: new Date().toLocaleString()
+  };
+
+  const saves = await getSaveSlots(user.userId);
+  let slotIndex = saves.findIndex(s => s === null);
+
+  if (slotIndex === -1) {
+    // 满档，弹窗覆盖
+    let html = '<div style="display:flex;flex-direction:column;gap:8px;">';
+    saves.forEach((s, i) => {
+      if (s && s.save_data) {
+        html += `<div class="slot-item" onclick="overwriteAndStart(${i})"><div class="slot-name">${s.save_data.playerName || '无名修士'}</div><div class="slot-info">职业: ${s.save_data.profession || '未知'} | 气运: ${(s.save_data.chips || 0).toLocaleString()} | 第${s.save_data.round || 1}局</div></div>`;
+      } else {
+        html += `<div class="slot-item empty">存档${i+1}：空空如也</div>`;
+      }
+    });
+    html += '</div>';
+    showModal('存档已满，请选择覆盖', html);
+    // 把 saveData 暂存到全局，供覆盖回调使用
+    window._pendingSaveData = saveData;
+    return;
+  }
+
+  await saveToSlot(user.userId, slotIndex + 1, saveData);
+  localStorage.setItem('daopai_new_game', JSON.stringify(saveData));
+  window.location.href = 'battle.html?slot=' + slotIndex + '&new=1';
+}
+
+async function overwriteAndStart(slotIndex) {
+  closeModal();
+  const saveData = window._pendingSaveData;
+  if (!saveData) return;
+  const user = getCurrentUser();
+  showConfirm('确认覆盖', `确定要覆盖存档${slotIndex + 1}吗？旧的存档将无法恢复。`, async () => {
+    await saveToSlot(user.userId, slotIndex + 1, saveData);
+    localStorage.setItem('daopai_new_game', JSON.stringify(saveData));
+    window.location.href = 'battle.html?slot=' + slotIndex + '&new=1';
+  });
+}
+</script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</body>
+</html>

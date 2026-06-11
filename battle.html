@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>道牌斗法：气运争锋 - 牌桌</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- 牌局间歇 -->
+<div class="intermission-wrap" id="intermissionWrap" style="display:none;">
+  <button class="back-icon-btn" id="btn-back-im" title="返回主选单">←</button>
+  <div class="page-wrap" style="max-width: 640px;">
+    <h2>牌局间歇</h2>
+    <div class="im-character">
+      <div class="im-name" id="imName">无名修士</div>
+      <div class="im-meta" id="imMeta">男 · 青年 · 剑气</div>
+      <div class="im-story" id="imStory"></div>
+    </div>
+    <div class="im-stats">
+      <div class="im-stat"><div class="label">剩余气运</div><div class="value" id="imChips">0</div></div>
+      <div class="im-stat"><div class="label">赛事进度</div><div class="value" id="imProgress">第 1 / 5 局</div></div>
+      <div class="im-stat"><div class="label">剩余修士</div><div class="value" id="imPlayers">6 人</div></div>
+      <div class="im-stat"><div class="label">已进行时长</div><div class="value" id="imDuration">00:00:00</div></div>
+    </div>
+    <div class="im-actions">
+      <button class="btn-primary" id="btn-next-hand" style="font-size:16px; padding:12px;">▶ 开始下一局</button>
+      <button class="btn-secondary" id="btn-im-save">💾 保存进度</button>
+      <button class="btn-secondary" id="btn-im-rules">📖 玩法说明</button>
+
+    </div>
+  </div>
+</div>
+
+<!-- 牌局结算 -->
+<div class="hand-result-wrap" id="handResultWrap" style="display:none;">
+  <div class="page-wrap" style="max-width: 560px;">
+    <h2>牌局结算</h2>
+    <div id="handResultBody" style="max-height:50vh; overflow-y:auto; margin:10px 0;"></div>
+    <button class="btn-primary" id="btn-confirm-hand" style="margin-top:10px;">确认牌局结束</button>
+  </div>
+</div>
+
+<!-- 结局 -->
+<div class="ending-wrap" id="endingWrap" style="display:none;">
+  <div class="page-wrap" style="max-width: 640px;">
+    <h2 id="endingTitle"></h2>
+    <div class="story-text" id="endingText" style="max-height:60vh;"></div>
+    <div class="nav-buttons">
+      <button class="btn-secondary" onclick="window.location.href='menu.html'">回到主选单</button>
+      <button class="btn-primary" onclick="window.location.href='story.html'">开始新的故事</button>
+    </div>
+  </div>
+</div>
+
+<div class="arena-wrap" id="arenaWrap">
+  <button class="back-icon-btn" id="btn-back-arena" title="返回主选单">←</button>
+  <svg viewBox="0 0 1140 700" preserveAspectRatio="xMidYMid meet">
+    <defs>
+      <radialGradient id="arenaGrad" cx="50%" cy="55%" r="55%">
+        <stop offset="0%" stop-color="#d8d4c8"/>
+        <stop offset="50%" stop-color="#cdc8bc"/>
+        <stop offset="100%" stop-color="#c4bfb2"/>
+      </radialGradient>
+      <filter id="softGlow"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    </defs>
+    <rect width="1140" height="700" fill="url(#arenaGrad)"/>
+
+    <g transform="translate(570, 360)" opacity="0.1" stroke="#9aa890" fill="none" stroke-width="1">
+      <circle r="140"/>
+      <circle r="110" stroke-dasharray="6 4"/>
+      <circle r="170" stroke-dasharray="3 6" opacity="0.6"/>
+      <line x1="0" y1="-140" x2="0" y2="140"/>
+      <line x1="-140" y1="0" x2="140" y2="0"/>
+      <line x1="-99" y1="-99" x2="99" y2="99"/>
+      <line x1="99" y1="-99" x2="-99" y2="99"/>
+      <path d="M -70,-70 Q 0,-140 70,-70" stroke-width="0.5"/>
+      <path d="M 70,-70 Q 140,0 70,70" stroke-width="0.5"/>
+      <path d="M 70,70 Q 0,140 -70,70" stroke-width="0.5"/>
+      <path d="M -70,70 Q -140,0 -70,-70" stroke-width="0.5"/>
+    </g>
+
+    <circle cx="570" cy="360" r="100" fill="none" stroke="#9aa890" stroke-width="0.5" opacity="0.08" filter="url(#softGlow)"/>
+
+    <g stroke="#9aa890" stroke-width="0.8" opacity="0.12" stroke-dasharray="5 5" fill="none">
+      <path d="M 300 140 Q 435 220 570 220 Q 705 220 840 140"/>
+      <path d="M 182 140 Q 120 250 120 350 Q 120 450 300 550"/>
+      <path d="M 958 140 Q 1020 250 1020 350 Q 1020 450 840 550"/>
+      <path d="M 300 550 Q 435 620 570 620 Q 705 620 840 550"/>
+    </g>
+
+    <g fill="none" stroke="#9aa890" stroke-width="0.6" opacity="0.08">
+      <path d="M 80,580 Q 100,560 120,580 T 160,580"/>
+      <path d="M 980,580 Q 1000,560 1020,580 T 1060,580"/>
+      <path d="M 50,120 Q 70,105 90,120 T 130,120"/>
+      <path d="M 1010,120 Q 1030,105 1050,120 T 1090,120"/>
+    </g>
+
+    <text x="30" y="55" fill="#9aa890" font-size="32" opacity="0.12" font-family="serif">☴</text>
+    <text x="1078" y="55" fill="#9aa890" font-size="32" opacity="0.12" font-family="serif">☲</text>
+    <text x="30" y="665" fill="#9aa890" font-size="32" opacity="0.12" font-family="serif">☵</text>
+    <text x="1078" y="665" fill="#9aa890" font-size="32" opacity="0.12" font-family="serif">☶</text>
+  </svg>
+
+  <!-- 轮到你了提示 -->
+  <div class="turn-hint" id="turnHint" style="display:none;">▶ 轮到你行动了</div>
+
+  <!-- 顶部功能栏 -->
+  <div class="top-bar">
+    <div class="sys-btns">
+      <button class="sys-btn" id="btn-rules">📖 玩法说明</button>
+      <button class="sys-btn" id="btn-save">💾 保存进度</button>
+      <button class="sys-btn" id="btn-load">📂 读取进度</button>
+
+    </div>
+    <div class="top-info">
+      <span>轮次：<b id="info-round">第 1 局</b></span>
+      <span>阶段：<b id="info-phase">藏锋</b></span>
+      <span>盲注：<b id="info-blinds">100 / 200</b></span>
+      <span>行动：<b id="info-turn">--</b></span>
+    </div>
+  </div>
+
+  <!-- 左侧斗法过程（桌面） -->
+  <div class="battle-log desktop-only">
+    <h3>⚔️ 斗法过程</h3>
+    <div class="log-body" id="logBody"></div>
+    <div class="gm-box">
+      <input type="text" placeholder="输入GM命令，如 /add 5000" id="gm-input">
+    </div>
+  </div>
+
+  <!-- 手机版播报（底部抽屉） -->
+  <div class="mobile-log-sheet mobile-only" id="mobileLogSheet">
+    <div class="mobile-log-header" id="btn-mobile-log">
+      <span>📜 斗法过程</span>
+      <span class="ml-chevron" id="mlChevron">▲</span>
+    </div>
+    <div class="mobile-log-body" id="mobileLogBodyContainer">
+      <div id="mobileLogBody" style="font-size:12px; line-height:1.9; color:#5a6b62;"></div>
+    </div>
+  </div>
+
+  <!-- 主游戏区 -->
+  <div class="game-area">
+
+    <!-- AI 座位 -->
+    <div class="seat-wrap" id="sw1" style="left:16%; top:16%;">
+      <div class="seat" id="s1">
+        <div class="seat-avatar">⚔️</div>
+        <div class="seat-name">---</div>
+        <div class="seat-chips">---</div>
+        <div class="seat-bet"></div>
+        <div class="seat-status">---</div>
+        <div class="skill-slot">暂无技能 🔍</div>
+      </div>
+      <div class="seat-hands" id="sh1"></div>
+    </div>
+
+    <div class="seat-wrap" id="sw2" style="left:6%; top:36%;">
+      <div class="seat" id="s2">
+        <div class="seat-avatar">🐺</div>
+        <div class="seat-name">---</div>
+        <div class="seat-chips">---</div>
+        <div class="seat-bet"></div>
+        <div class="seat-status">---</div>
+        <div class="skill-slot">暂无技能 🔍</div>
+      </div>
+      <div class="seat-hands" id="sh2"></div>
+    </div>
+
+    <div class="seat-wrap" id="sw3" style="left:50%; top:7%; transform:translateX(-50%);">
+      <div class="seat" id="s3">
+        <div class="seat-avatar">🧪</div>
+        <div class="seat-name">---</div>
+        <div class="seat-chips">---</div>
+        <div class="seat-bet"></div>
+        <div class="seat-status">---</div>
+        <div class="skill-slot">暂无技能 🔍</div>
+      </div>
+      <div class="seat-hands" id="sh3"></div>
+    </div>
+
+    <div class="seat-wrap" id="sw4" style="right:2%; top:36%; left:auto;">
+      <div class="seat" id="s4">
+        <div class="seat-avatar">🛡️</div>
+        <div class="seat-name">---</div>
+        <div class="seat-chips">---</div>
+        <div class="seat-bet"></div>
+        <div class="seat-status">---</div>
+        <div class="skill-slot">暂无技能 🔍</div>
+      </div>
+      <div class="seat-hands" id="sh4"></div>
+    </div>
+
+    <div class="seat-wrap" id="sw5" style="right:8%; top:16%; left:auto;">
+      <div class="seat" id="s5">
+        <div class="seat-avatar">🦋</div>
+        <div class="seat-name">---</div>
+        <div class="seat-chips">---</div>
+        <div class="seat-bet"></div>
+        <div class="seat-status">---</div>
+        <div class="skill-slot">暂无技能 🔍</div>
+      </div>
+      <div class="seat-hands" id="sh5"></div>
+    </div>
+
+    <!-- 天时牌区 -->
+    <div class="tianshi-zone" style="top: 32%;">
+      <div class="tianshi-label">◇ 天 时 牌 ◇</div>
+      <div class="tianshi-cards" id="tianshiCards">
+        <div class="dcard-back"></div>
+        <div class="dcard-back"></div>
+        <div class="dcard-back"></div>
+        <div class="dcard-back"></div>
+        <div class="dcard-back"></div>
+      </div>
+    </div>
+
+    <!-- 气运池 -->
+    <div class="qi-yun-pool" style="top: 52%;" id="qiYunPool">气运池 0</div>
+
+    <!-- 玩家大区 -->
+    <div class="player-zone">
+      <div class="player-pose-area">
+        <div class="pose-avatar">🧘</div>
+        <div class="pose-label">[角色立绘区域]</div>
+      </div>
+      <div class="player-info-bar">
+        <span class="pin-name" id="playerName">无名修士</span>
+        <span class="pin-chips" id="playerChips">气运: 0</span>
+        <span class="pin-bet" id="playerBet">本轮未注</span>
+        <span class="pin-skill">技能: 暂无 🔍</span>
+      </div>
+      <div class="dili-zone">
+        <div class="dili-label">地利牌</div>
+        <div class="dcard-back" id="pCard1"></div>
+        <div class="dcard-back" id="pCard2"></div>
+      </div>
+    </div>
+
+    <!-- 操作按钮 -->
+    <div class="action-bar">
+      <button class="act-btn act-fold" id="btn-fold">
+        敛息遁走
+        <span class="act-sub">弃牌</span>
+      </button>
+      <button class="act-btn act-check" id="btn-check">
+        静观其变
+        <span class="act-sub">过牌</span>
+      </button>
+      <button class="act-btn act-call" id="btn-call">
+        接招
+        <span class="act-sub">应劫</span>
+      </button>
+      <button class="act-btn act-raise" id="btn-raise">
+        加注气运
+        <span class="act-sub">逆天</span>
+      </button>
+      <button class="act-btn act-allin" id="btn-allin">
+        本源全倾
+        <span class="act-sub">破釜沉舟</span>
+      </button>
+      <button class="act-btn" id="btn-skip-hand" style="display:none; border-color:#8a8a70; color:#6a6a4a;">
+        跳过本局
+        <span class="act-sub">立即结算</span>
+      </button>
+    </div>
+
+    <!-- 加注面板 -->
+    <div class="raise-panel" id="raisePanel">
+      <span style="color:#8a8a78; font-size:12px;">加注数额：</span>
+      <input type="number" id="raiseInput" value="400" min="400" step="100">
+      <div class="rp-btns">
+        <button data-amount="0" class="rp-preset">最低</button>
+        <button data-amount="0" class="rp-preset">半池</button>
+        <button data-amount="0" class="rp-preset">全下</button>
+        <button id="btn-confirm-raise" style="border-color:rgba(130,150,110,0.6); color:#6b7d73;">确认</button>
+        <button id="btn-cancel-raise">取消</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/storage.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/story-data.js"></script>
+<script src="js/poker-engine.js"></script>
+<script src="js/ai.js"></script>
+<script src="js/battle.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</body>
+</html>
