@@ -186,7 +186,9 @@ function evaluateHand(cards) {
 
 function handScore(evalResult) {
   let score = evalResult.rank;
-  for (const k of evalResult.kickers) {
+  const kickers = evalResult.kickers.slice();
+  while (kickers.length < 5) kickers.push(0);
+  for (const k of kickers) {
     score = score * 15 + k;
   }
   return score;
@@ -272,7 +274,12 @@ class PokerGame {
     this.handLog = [];
 
     for (const p of this.players) {
-      if (!p.eliminated) p.resetForNewHand();
+      if (!p.eliminated) {
+        p.resetForNewHand();
+      } else {
+        p.holeCards = [];
+        p.bestHand = null;
+      }
     }
 
     const active = this.activePlayers();
@@ -484,6 +491,9 @@ class PokerGame {
             amount: diff * (all.length - i),
             eligiblePlayers: eligible
           });
+        } else if (pots.length > 0) {
+          // 若当前层级没有 eligible 玩家，将金额并入前一个 pot
+          pots[pots.length - 1].amount += diff * (all.length - i);
         }
         prev = all[i].totalBet;
       }

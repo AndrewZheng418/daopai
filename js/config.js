@@ -7,19 +7,9 @@ let supabaseClient = null;
 let supabaseReady = false;
 
 function initSupabase() {
-    if (typeof supabase !== 'undefined' && SUPABASE_URL.includes('supabase.co') && SUPABASE_ANON_KEY.length > 20) {
-        try {
-            supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-            supabaseReady = true;
-            console.log('Supabase 已连接');
-        } catch (e) {
-            console.warn('Supabase 初始化失败，将使用本地存储:', e);
-            supabaseReady = false;
-        }
-    } else {
-        console.warn('Supabase 未配置，将使用本地存储作为备用');
-        supabaseReady = false;
-    }
+    // Supabase 已禁用，全部使用 localStorage
+    supabaseReady = false;
+    console.log('Supabase 已禁用，使用本地存储');
 }
 
 if (document.readyState === 'loading') {

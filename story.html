@@ -135,7 +135,7 @@
     </div>
     <p id="diff-desc" style="font-size:13px; color:#5a6b62; line-height:1.7; min-height:60px; text-align:center;"></p>
     <div class="nav-buttons">
-      <button class="btn-secondary" onclick="goMenu()">返回主选单</button>
+      <button class="back-icon-btn" onclick="goMenu()" title="返回主选单">←</button>
       <button class="btn-primary" id="btn-diff-next" disabled>下一步</button>
     </div>
   </div>
@@ -164,7 +164,7 @@
 赌斗，即将开始。
     </div>
     <div class="nav-buttons">
-      <button class="btn-secondary" onclick="goMenu()">返回主选单</button>
+      <button class="back-icon-btn" onclick="goMenu()" title="返回主选单">←</button>
       <button class="btn-primary" onclick="showStep('select')">选择你的角色</button>
     </div>
   </div>
@@ -281,7 +281,12 @@ document.querySelectorAll('.diff-btn').forEach(btn => {
 });
 
 document.getElementById('btn-diff-next').addEventListener('click', () => {
-  if (!selectedDifficulty) return;
+  if (!selectedDifficulty) {
+    document.getElementById('diff-desc').textContent = '请先选择一项难度';
+    document.getElementById('diff-desc').style.color = '#a05050';
+    return;
+  }
+  document.getElementById('diff-desc').style.color = '#5a6b62';
   showStep('prologue');
 });
 
@@ -423,6 +428,5 @@ async function overwriteAndStart(slotIndex) {
   });
 }
 </script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </body>
 </html>

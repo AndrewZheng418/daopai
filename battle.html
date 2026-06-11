@@ -27,8 +27,13 @@
     <div class="im-actions">
       <button class="btn-primary" id="btn-next-hand" style="font-size:16px; padding:12px;">▶ 开始下一局</button>
       <button class="btn-secondary" id="btn-im-save">💾 保存进度</button>
+      <button class="btn-secondary" id="btn-im-load">📂 读取进度</button>
       <button class="btn-secondary" id="btn-im-rules">📖 玩法说明</button>
-
+      <div style="display:flex; gap:10px;">
+        <button class="btn-secondary" id="btn-im-export" style="flex:1; font-size:13px;">📤 导出存档</button>
+        <button class="btn-secondary" id="btn-im-import" style="flex:1; font-size:13px;">📥 导入存档</button>
+      </div>
+      <input type="file" id="importFileInput" accept=".json" style="display:none;">
     </div>
   </div>
 </div>
@@ -148,10 +153,12 @@
     <!-- AI 座位 -->
     <div class="seat-wrap" id="sw1" style="left:16%; top:16%;">
       <div class="seat" id="s1">
-        <div class="seat-avatar">⚔️</div>
+        <div class="seat-top">
+          <div class="seat-avatar">⚔️</div>
+          <div class="seat-bet"></div>
+        </div>
         <div class="seat-name">---</div>
         <div class="seat-chips">---</div>
-        <div class="seat-bet"></div>
         <div class="seat-status">---</div>
         <div class="skill-slot">暂无技能 🔍</div>
       </div>
@@ -160,10 +167,12 @@
 
     <div class="seat-wrap" id="sw2" style="left:6%; top:36%;">
       <div class="seat" id="s2">
-        <div class="seat-avatar">🐺</div>
+        <div class="seat-top">
+          <div class="seat-avatar">🐺</div>
+          <div class="seat-bet"></div>
+        </div>
         <div class="seat-name">---</div>
         <div class="seat-chips">---</div>
-        <div class="seat-bet"></div>
         <div class="seat-status">---</div>
         <div class="skill-slot">暂无技能 🔍</div>
       </div>
@@ -172,10 +181,12 @@
 
     <div class="seat-wrap" id="sw3" style="left:50%; top:7%; transform:translateX(-50%);">
       <div class="seat" id="s3">
-        <div class="seat-avatar">🧪</div>
+        <div class="seat-top">
+          <div class="seat-avatar">🧪</div>
+          <div class="seat-bet"></div>
+        </div>
         <div class="seat-name">---</div>
         <div class="seat-chips">---</div>
-        <div class="seat-bet"></div>
         <div class="seat-status">---</div>
         <div class="skill-slot">暂无技能 🔍</div>
       </div>
@@ -184,10 +195,12 @@
 
     <div class="seat-wrap" id="sw4" style="right:2%; top:36%; left:auto;">
       <div class="seat" id="s4">
-        <div class="seat-avatar">🛡️</div>
+        <div class="seat-top">
+          <div class="seat-avatar">🛡️</div>
+          <div class="seat-bet"></div>
+        </div>
         <div class="seat-name">---</div>
         <div class="seat-chips">---</div>
-        <div class="seat-bet"></div>
         <div class="seat-status">---</div>
         <div class="skill-slot">暂无技能 🔍</div>
       </div>
@@ -196,10 +209,12 @@
 
     <div class="seat-wrap" id="sw5" style="right:8%; top:16%; left:auto;">
       <div class="seat" id="s5">
-        <div class="seat-avatar">🦋</div>
+        <div class="seat-top">
+          <div class="seat-avatar">🦋</div>
+          <div class="seat-bet"></div>
+        </div>
         <div class="seat-name">---</div>
         <div class="seat-chips">---</div>
-        <div class="seat-bet"></div>
         <div class="seat-status">---</div>
         <div class="skill-slot">暂无技能 🔍</div>
       </div>
@@ -223,16 +238,22 @@
 
     <!-- 玩家大区 -->
     <div class="player-zone">
-      <div class="player-pose-area">
-        <div class="pose-avatar">🧘</div>
-        <div class="pose-label">[角色立绘区域]</div>
+      <div class="player-top-row">
+        <div class="player-pose-area">
+          <div class="pose-avatar">🧘</div>
+          <div class="pose-label">[角色立绘区域]</div>
+        </div>
+        <div class="player-side-bet">
+          <span class="pin-bet" id="playerBet">本轮未注</span>
+        </div>
       </div>
       <div class="player-info-bar">
         <span class="pin-name" id="playerName">无名修士</span>
         <span class="pin-chips" id="playerChips">气运: 0</span>
-        <span class="pin-bet" id="playerBet">本轮未注</span>
-        <span class="pin-skill">技能: 暂无 🔍</span>
+        <span class="pin-skill" id="pinSkill">技能: 暂无 🔍</span>
+        <span class="pin-best-hand" id="btn-best-hand">最佳手牌 🔍</span>
       </div>
+      <div class="pin-best-hand-rank" id="bestHandRankLabel"></div>
       <div class="dili-zone">
         <div class="dili-label">地利牌</div>
         <div class="dcard-back" id="pCard1"></div>
@@ -291,6 +312,6 @@
 <script src="js/poker-engine.js"></script>
 <script src="js/ai.js"></script>
 <script src="js/battle.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
 </body>
 </html>

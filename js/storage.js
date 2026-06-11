@@ -1,5 +1,5 @@
 // js/storage.js
-// Dual-backend storage: Supabase primary, localStorage fallback
+// localStorage only + JSON export/import
 
 const STORAGE_PREFIX = 'daopai_';
 
@@ -25,15 +25,6 @@ function generateId() {
 // --- Users ---
 
 async function getUserByUsername(username) {
-  if (typeof supabaseReady !== 'undefined' && supabaseReady && typeof supabaseClient !== 'undefined' && supabaseClient) {
-    const { data, error } = await supabaseClient
-      .from('users')
-      .select('*')
-      .eq('username', username)
-      .single();
-    if (!error) return data;
-    console.warn('Supabase getUserByUsername failed', error);
-  }
   const users = getLocalArray(STORAGE_PREFIX + 'users');
   return users.find(u => u.username === username) || null;
 }
@@ -46,15 +37,6 @@ async function createUser({ username, password_hash, display_name }) {
     display_name: display_name || username,
     created_at: new Date().toISOString()
   };
-  if (typeof supabaseReady !== 'undefined' && supabaseReady && typeof supabaseClient !== 'undefined' && supabaseClient) {
-    const { data, error } = await supabaseClient
-      .from('users')
-      .insert([payload])
-      .select()
-      .single();
-    if (!error && data) return data;
-    console.warn('Supabase createUser failed, falling back', error);
-  }
   const key = STORAGE_PREFIX + 'users';
   const users = getLocalArray(key);
   if (users.find(u => u.username === username)) {
@@ -69,19 +51,8 @@ async function createUser({ username, password_hash, display_name }) {
 
 async function getSaveSlots(userId) {
   if (!userId) return [null, null, null];
-  let saves = [];
-  if (typeof supabaseReady !== 'undefined' && supabaseReady && typeof supabaseClient !== 'undefined' && supabaseClient) {
-    const { data, error } = await supabaseClient
-      .from('saves')
-      .select('*')
-      .eq('user_id', userId)
-      .order('slot_number', { ascending: true });
-    if (!error && data) saves = data;
-    else console.warn('Supabase getSaveSlots failed', error);
-  } else {
-    const key = STORAGE_PREFIX + 'saves_' + userId;
-    saves = getLocalArray(key);
-  }
+  const key = STORAGE_PREFIX + 'saves_' + userId;
+  const saves = getLocalArray(key);
   const slots = [null, null, null];
   for (const s of saves) {
     const idx = (typeof s.slot_number !== 'undefined' ? s.slot_number : s.slot) - 1;
@@ -98,15 +69,6 @@ async function saveToSlot(userId, slotNumber, saveData) {
     save_data: saveData,
     updated_at: new Date().toISOString()
   };
-  if (typeof supabaseReady !== 'undefined' && supabaseReady && typeof supabaseClient !== 'undefined' && supabaseClient) {
-    const { data, error } = await supabaseClient
-      .from('saves')
-      .upsert(payload, { onConflict: ['user_id', 'slot_number'] })
-      .select()
-      .single();
-    if (!error && data) return data;
-    console.warn('Supabase saveToSlot failed, falling back', error);
-  }
   const key = STORAGE_PREFIX + 'saves_' + userId;
   const saves = getLocalArray(key);
   const idx = saves.findIndex(s => (typeof s.slot_number !== 'undefined' ? s.slot_number : s.slot) === slotNumber);
@@ -119,14 +81,6 @@ async function saveToSlot(userId, slotNumber, saveData) {
 
 async function deleteSlot(userId, slotNumber) {
   if (!userId) return false;
-  if (typeof supabaseReady !== 'undefined' && supabaseReady && typeof supabaseClient !== 'undefined' && supabaseClient) {
-    const { error } = await supabaseClient
-      .from('saves')
-      .delete()
-      .eq('user_id', userId)
-      .eq('slot_number', slotNumber);
-    if (!error) return true;
-  }
   const key = STORAGE_PREFIX + 'saves_' + userId;
   const saves = getLocalArray(key);
   const filtered = saves.filter(s => (typeof s.slot_number !== 'undefined' ? s.slot_number : s.slot) !== slotNumber);
@@ -139,14 +93,6 @@ async function deleteSlot(userId, slotNumber) {
 async function getUserData() {
   const session = JSON.parse(localStorage.getItem(STORAGE_PREFIX + 'session') || 'null');
   if (!session || !session.userId) return null;
-  if (typeof supabaseReady !== 'undefined' && supabaseReady && typeof supabaseClient !== 'undefined' && supabaseClient) {
-    const { data, error } = await supabaseClient
-      .from('users')
-      .select('*')
-      .eq('id', session.userId)
-      .single();
-    if (!error && data) return data;
-  }
   const users = getLocalArray(STORAGE_PREFIX + 'users');
   return users.find(u => u.id === session.userId) || null;
 }
@@ -156,4 +102,39 @@ function formatDuration(seconds) {
   const m = Math.floor((seconds % 3600) / 60);
   const s = seconds % 60;
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
+// --- JSON export/import ---
+
+function exportSavesToJSON(userId) {
+  const key = STORAGE_PREFIX + 'saves_' + userId;
+  const saves = getLocalArray(key);
+  const blob = new Blob([JSON.stringify(saves, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `daopai_saves_${userId}_${new Date().toISOString().slice(0,10)}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+async function importSavesFromJSON(userId, file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = JSON.parse(e.target.result);
+        if (!Array.isArray(data)) throw new Error('存档文件格式不正确，应为数组');
+        const key = STORAGE_PREFIX + 'saves_' + userId;
+        localStorage.setItem(key, JSON.stringify(data));
+        resolve(data);
+      } catch (err) {
+        reject(err);
+      }
+    };
+    reader.onerror = () => reject(new Error('文件读取失败'));
+    reader.readAsText(file);
+  });
 }

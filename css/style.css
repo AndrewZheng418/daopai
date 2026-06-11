@@ -68,7 +68,7 @@ body {
   padding: 0 16px;
   z-index: 10;
 }
-.top-bar .sys-btns { display: flex; gap: 8px; }
+.top-bar .sys-btns { display: flex; gap: 8px; margin-left: 44px; }
 .sys-btn {
   padding: 5px 12px;
   border: 1px solid rgba(140, 150, 130, 0.4);
@@ -178,14 +178,23 @@ body {
 }
 .seat-name { font-size: 12px; font-weight: bold; color: #2f3d36; margin-top: 4px; text-shadow: 0 1px 2px rgba(0,0,0,0.08); }
 .seat-chips { font-size: 12px; color: #6b7d73; margin-top: 1px; }
+.seat-top { display: flex; align-items: center; gap: 8px; }
 .seat-bet {
-  font-size: 11px;
+  font-size: 15px;
   color: #7a6a3a;
-  margin-top: 3px;
-  padding: 2px 8px;
+  padding: 4px 12px;
   border-radius: 10px;
   background: rgba(200, 180, 100, 0.18);
   border: 1px solid rgba(200, 180, 100, 0.3);
+  white-space: nowrap;
+  transition: transform 0.3s ease, opacity 0.3s ease;
+}
+.seat-bet.bet-pop {
+  animation: betPop 0.4s ease;
+}
+@keyframes betPop {
+  0% { transform: scale(0.8) translateX(-8px); opacity: 0; }
+  100% { transform: scale(1) translateX(0); opacity: 1; }
 }
 .seat-status { font-size: 10px; margin-top: 2px; padding: 1px 8px; border-radius: 8px; background: rgba(0,0,0,0.08); color: #8a8a78; }
 .skill-slot {
@@ -237,7 +246,7 @@ body {
 /* 轮到你了的提示条 */
 .turn-hint {
   position: absolute;
-  top: 50px;
+  top: 58%;
   left: 50%;
   transform: translateX(-50%);
   background: rgba(200, 168, 74, 0.15);
@@ -337,6 +346,7 @@ body {
   font-size: 11px;
   line-height: 1.3;
 }
+.dcard .d-top span { font-size: 11px; }
 .dcard .d-mid {
   position: absolute;
   top: 50%; left: 50%;
@@ -376,6 +386,17 @@ body {
   width: 420px;
   z-index: 2;
 }
+.player-top-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 6px;
+}
+.player-side-bet {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
 .player-pose-area {
   width: 160px;
   height: 110px;
@@ -387,7 +408,6 @@ body {
   justify-content: center;
   color: #8a8a78;
   font-size: 13px;
-  margin-bottom: 6px;
   position: relative;
 }
 .player-pose-area .pose-avatar {
@@ -424,9 +444,9 @@ body {
 .player-info-bar .pin-name { font-size: 15px; font-weight: bold; color: #4a6a4a; }
 .player-info-bar .pin-chips { font-size: 14px; color: #6b7d73; }
 .player-info-bar .pin-bet {
-  font-size: 12px;
+  font-size: 14px;
   color: #7a6a3a;
-  padding: 2px 10px;
+  padding: 3px 12px;
   border-radius: 10px;
   background: rgba(200, 180, 100, 0.18);
   border: 1px solid rgba(200, 180, 100, 0.3);
@@ -440,6 +460,19 @@ body {
   cursor: pointer;
 }
 .player-info-bar .pin-skill:hover { color: #6b7d73; border-color: #6b7d73; background: rgba(140,150,130,0.12); }
+.player-info-bar .pin-best-hand {
+  padding: 2px 10px;
+  border: 1px dashed rgba(140, 150, 130, 0.4);
+  border-radius: 6px;
+  font-size: 11px;
+  color: #8a8a78;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.player-info-bar .pin-best-hand:hover { color: #6b7d73; border-color: #6b7d73; background: rgba(140,150,130,0.12); }
+.player-info-bar .pin-best-hand.active { border-color: #c8a84a; color: #8a6a2a; background: rgba(200,168,74,0.15); }
+.pin-best-hand-rank { font-size: 11px; color: #8a6a2a; font-weight: bold; min-height: 14px; text-align: center; margin-bottom: 4px; }
+.dcard.highlight { box-shadow: 0 0 14px rgba(200,168,74,0.7); border-color: #c8a84a; transform: scale(1.06); z-index: 5; }
 
 .dili-zone {
   display: flex;
@@ -639,8 +672,8 @@ body {
   .player-info-bar .pin-name { font-size: 13px; }
   .player-info-bar .pin-chips { font-size: 12px; }
 
-  .action-bar { gap: 6px; width: 96%; justify-content: center; }
-  .act-btn { padding: 10px 8px; font-size: 12px; min-width: 56px; }
+  .action-bar { gap: 5px; width: 96%; justify-content: center; bottom: 48px; }
+  .act-btn { padding: 8px 6px; font-size: 11px; min-width: 52px; }
   .act-btn .act-sub { font-size: 8px; }
 
   .seat-wrap[id="sw1"] { left: 5% !important; top: 12% !important; }
@@ -701,6 +734,7 @@ body {
   border: 1px solid rgba(140, 150, 130, 0.2);
   border-radius: 12px;
   margin: 20px auto;
+  position: relative;
 }
 .page-wrap h2 {
   text-align: center;

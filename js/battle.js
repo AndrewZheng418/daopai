@@ -12,6 +12,12 @@ let handEndedHandled = false;
 // AI 垃圾话控制：每个行动轮次（preflop/flop/turn/river）最多说一次
 let trashTalkState = { round: '', talkers: new Set() };
 
+// 最佳手牌高亮状态
+let bestHandHighlightOn = false;
+
+// 筹码变化动画追踪
+const lastRenderedBets = {};
+
 async function init() {
   const user = getCurrentUser();
   if (!user) { window.location.href = 'index.html'; return; }
@@ -75,7 +81,33 @@ async function init() {
     startHand();
   });
   document.getElementById('btn-im-save').addEventListener('click', () => doSave('intermission'));
+  document.getElementById('btn-im-load').addEventListener('click', doLoad);
   document.getElementById('btn-im-rules').addEventListener('click', showRules);
+
+  // 导出 / 导入存档
+  document.getElementById('btn-im-export').addEventListener('click', () => {
+    const user = getCurrentUser();
+    if (user) exportSavesToJSON(user.userId);
+  });
+  document.getElementById('btn-im-import').addEventListener('click', () => {
+    document.getElementById('importFileInput').click();
+  });
+  document.getElementById('importFileInput').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const user = getCurrentUser();
+    if (!user) return;
+    try {
+      await importSavesFromJSON(user.userId, file);
+      showModal('导入成功', '存档已导入，请返回主选单重新进入游戏以加载新存档。');
+    } catch (err) {
+      showModal('导入失败', err.message);
+    }
+    e.target.value = '';
+  });
+
+  // 最佳手牌按钮
+  document.getElementById('btn-best-hand').addEventListener('click', toggleBestHandHighlight);
 
   document.getElementById('btn-confirm-hand').addEventListener('click', () => {
     document.getElementById('handResultWrap').style.display = 'none';
@@ -262,7 +294,18 @@ function render() {
     wrap.style.display = 'flex';
     seat.querySelector('.seat-name').textContent = p.name;
     seat.querySelector('.seat-chips').textContent = `💰 ${p.chips.toLocaleString()}`;
-    seat.querySelector('.seat-bet').textContent = p.currentBet > 0 ? `💫 ${p.currentBet.toLocaleString()}` : '';
+    const betEl = seat.querySelector('.seat-bet');
+    const oldBet = lastRenderedBets['s' + i] || 0;
+    const newBet = p.totalBet;
+    if (betEl) {
+      betEl.textContent = newBet > 0 ? `💫 ${newBet.toLocaleString()}` : '';
+      if (newBet !== oldBet && newBet > 0) {
+        betEl.classList.remove('bet-pop');
+        void betEl.offsetWidth;
+        betEl.classList.add('bet-pop');
+      }
+      lastRenderedBets['s' + i] = newBet;
+    }
     const statusEl = seat.querySelector('.seat-status');
     if (p.folded) statusEl.textContent = '已遁走';
     else if (p.allIn) statusEl.textContent = '破釜沉舟';
@@ -291,7 +334,18 @@ function render() {
   if (hp) {
     document.getElementById('playerName').textContent = hp.name;
     document.getElementById('playerChips').textContent = `气运: ${hp.chips.toLocaleString()}`;
-    document.getElementById('playerBet').textContent = hp.currentBet > 0 ? `💫 ${hp.currentBet.toLocaleString()}` : '本轮未注';
+    const playerBetEl = document.getElementById('playerBet');
+    const oldPlayerBet = lastRenderedBets['player'] || 0;
+    const newPlayerBet = hp.totalBet;
+    if (playerBetEl) {
+      playerBetEl.textContent = newPlayerBet > 0 ? `💫 ${newPlayerBet.toLocaleString()}` : '本轮未注';
+      if (newPlayerBet !== oldPlayerBet && newPlayerBet > 0) {
+        playerBetEl.classList.remove('bet-pop');
+        void playerBetEl.offsetWidth;
+        playerBetEl.classList.add('bet-pop');
+      }
+      lastRenderedBets['player'] = newPlayerBet;
+    }
 
     // 玩家自己行动时高亮
     const playerZone = document.querySelector('.player-zone');
@@ -312,6 +366,7 @@ function render() {
 
   syncLog();
   renderActionButtons();
+  renderBestHandHighlight();
 }
 
 function cardDiv(card, id) {
@@ -320,7 +375,7 @@ function cardDiv(card, id) {
   const suitInfo = SUIT_NAMES[card.suit] || { name: card.suit, emoji: '' };
   const rankInfo = RANK_NAMES[card.rank] || card.rank;
   return `<div class="dcard ${cls}"${id ? ` id="${id}"` : ''}>
-    <div class="d-top">${card.rank}<br><span style="font-size:9px">${suitInfo.emoji}${suitInfo.name}</span></div>
+    <div class="d-top">${card.rank}<br><span style="font-size:11px">${suitInfo.emoji}${suitInfo.name}</span></div>
     <div class="d-mid">${card.suit}</div>
     <div class="d-btm">${rankInfo}</div>
   </div>`;
@@ -576,58 +631,154 @@ function onHandEnded() {
   if (user) saveToSlot(user.userId, saveSlot + 1, saveData);
 }
 
-function showHandResult() {
-  const body = document.getElementById('handResultBody');
-  let html = '<div style="font-size:13px; line-height:1.8; color:#2f3d36;">';
+function toggleBestHandHighlight() {
+  bestHandHighlightOn = !bestHandHighlightOn;
+  const btn = document.getElementById('btn-best-hand');
+  if (btn) btn.classList.toggle('active', bestHandHighlightOn);
+  renderBestHandHighlight();
+}
 
-  // 胜出者横幅
-  const winners = pokerGame.winners || [];
-  if (winners.length > 0) {
-    html += '<div style="background:rgba(140,160,120,0.15); border:1px solid rgba(100,130,90,0.35); border-radius:8px; padding:10px 14px; margin-bottom:12px; text-align:center;">';
-    winners.forEach(w => {
-      const isHuman = w.player.isHuman;
-      html += `<div style="font-size:15px; font-weight:bold; color:${isHuman ? '#4a6a4a' : '#5a6b62'};">
-        🏆 ${w.player.name}${isHuman ? '（你）' : ''} 夺得 ${w.amount.toLocaleString()} 气运
-      </div>`;
-    });
-    html += '</div>';
+function renderBestHandHighlight() {
+  document.querySelectorAll('.dcard.highlight').forEach(el => el.classList.remove('highlight'));
+  const rankLabel = document.getElementById('bestHandRankLabel');
+  if (rankLabel) rankLabel.textContent = '';
+
+  if (!bestHandHighlightOn || !pokerGame || !pokerGame.humanPlayer) return;
+
+  const hp = pokerGame.humanPlayer;
+  const allCards = (hp.holeCards || []).concat(pokerGame.communityCards || []);
+  if (allCards.length === 0) return;
+
+  const evalResult = evaluateHand(allCards);
+  const rankName = formatHandRank(evalResult);
+  if (rankLabel) rankLabel.textContent = rankName;
+
+  let bestCards = [];
+  if (allCards.length >= 5 && pokerGame.getBest5Cards) {
+    bestCards = pokerGame.getBest5Cards(hp);
+  } else {
+    bestCards = allCards;
   }
 
-  // 亮出所有未淘汰玩家的手牌 + 最佳五张（包括已弃牌者）
-  const revealPlayers = pokerGame.players.filter(p => !p.eliminated);
-  html += '<div style="margin-bottom:10px; font-weight:bold; color:#4a6a4a;">所有人手牌：</div>';
-  revealPlayers.forEach(p => {
-    const wonAmt = winners.find(w => w.player === p)?.amount || 0;
-    const holeHtml = p.holeCards.map(c => miniCardDiv(c)).join('');
-    const best5 = pokerGame.getBest5Cards(p);
-    const best5Html = best5.map(c => miniCardDiv(c)).join('');
-    const evalResult = evaluateHand(p.holeCards.concat(pokerGame.communityCards));
-    const rankName = formatHandRank(evalResult);
-    const isFolded = p.folded;
-    const foldInfo = isFolded ? `<span style="margin-left:6px; color:#999; font-size:11px;">（已弃牌${p.foldRound ? ' · ' + (phaseMap[p.foldRound] || p.foldRound) : ''}）</span>` : '';
-    html += `<div class="reveal-card ${wonAmt > 0 ? 'winner' : ''}" style="${isFolded ? 'opacity:0.6;' : ''}">
-      <div class="rc-name">${p.name} ${p.isHuman ? '（你）' : ''}${foldInfo}${wonAmt > 0 ? '<span style="margin-left:6px; color:#4a6a4a; font-size:11px;">🏆 +' + wonAmt.toLocaleString() + '</span>' : ''}</div>
-      <div style="margin:4px 0; color:#8a8a78; font-size:11px;">底牌：</div>
-      <div class="rc-hand" style="display:flex; gap:4px; margin:4px 0;">${holeHtml}</div>
-      <div style="margin:6px 0 4px; color:#8a8a78; font-size:11px;">最佳五张：</div>
-      <div class="rc-hand" style="display:flex; gap:4px; margin:4px 0;">${best5Html}</div>
-      <div class="rc-best">牌型：<span style="color:#4a6a4a; font-weight:bold;">${rankName}</span></div>
-    </div>`;
-  });
+  // 防御：如果 getBest5Cards 返回空但牌够 5 张，回退到全部可用牌
+  if (allCards.length >= 5 && bestCards.length === 0) {
+    bestCards = allCards;
+  }
 
-  // 筹码变化
-  html += '<div style="margin-top:10px; font-weight:bold; color:#4a6a4a;">筹码变化：</div>';
-  pokerGame.players.forEach(p => {
-    if (p.eliminated) {
-      html += `<div>${p.name}：已出局</div>`;
-    } else {
-      html += `<div>${p.name}：${p.chips.toLocaleString()} 气运</div>`;
+  // 用引用匹配，避免字符串拼接问题
+  const bestSet = new Set(bestCards);
+
+  const tsCards = document.getElementById('tianshiCards');
+  if (tsCards) {
+    tsCards.querySelectorAll('.dcard').forEach((el, i) => {
+      const c = pokerGame.communityCards[i];
+      if (c && bestSet.has(c)) el.classList.add('highlight');
+    });
+  }
+
+  const pc1 = document.getElementById('pCard1');
+  const pc2 = document.getElementById('pCard2');
+  if (pc1 && hp.holeCards[0] && bestSet.has(hp.holeCards[0])) pc1.classList.add('highlight');
+  if (pc2 && hp.holeCards[1] && bestSet.has(hp.holeCards[1])) pc2.classList.add('highlight');
+}
+
+function showHandResult() {
+  const body = document.getElementById('handResultBody');
+  const wrap = document.getElementById('handResultWrap');
+  try {
+    const phaseMap = { preflop: '天机晦暗', flop: '天机初现', turn: '天命流转', river: '尘埃落定', showdown: '揭晓', ended: '间歇', idle: '准备' };
+    let html = '<div style="font-size:13px; line-height:1.8; color:#2f3d36;">';
+
+    // 胜出者横幅（按玩家合并 side pot 赢取金额）
+    const winners = (pokerGame && pokerGame.winners) || [];
+    if (winners.length > 0) {
+      const winMap = new Map();
+      winners.forEach(w => {
+        if (!w || !w.player) return;
+        const key = w.player.id;
+        const prev = winMap.get(key);
+        if (prev) {
+          prev.amount += w.amount;
+        } else {
+          winMap.set(key, { player: w.player, amount: w.amount });
+        }
+      });
+      html += '<div style="background:rgba(140,160,120,0.15); border:1px solid rgba(100,130,90,0.35); border-radius:8px; padding:10px 14px; margin-bottom:12px; text-align:center;">';
+      winMap.forEach(w => {
+        const isHuman = w.player.isHuman;
+        html += `<div style="font-size:15px; font-weight:bold; color:${isHuman ? '#4a6a4a' : '#5a6b62'};">
+          🏆 ${w.player.name}${isHuman ? '（你）' : ''} 夺得 ${w.amount.toLocaleString()} 气运
+        </div>`;
+      });
+      html += '</div>';
     }
-  });
 
-  html += '</div>';
-  body.innerHTML = html;
-  document.getElementById('handResultWrap').style.display = 'flex';
+    // 天时牌展示
+    if (pokerGame && pokerGame.communityCards && pokerGame.communityCards.length > 0) {
+      html += '<div style="margin-bottom:8px; font-weight:bold; color:#4a6a4a;">天时牌：</div>';
+      html += '<div style="display:flex; gap:4px; margin-bottom:14px; flex-wrap:wrap;">';
+      html += pokerGame.communityCards.map(c => miniCardDiv(c)).join('');
+      html += '</div>';
+    }
+
+    // 亮出所有参与本局玩家的手牌 + 最佳五张（包括已弃牌者和刚出局者）
+    const revealPlayers = (pokerGame && pokerGame.players) ? pokerGame.players.filter(p => p.holeCards && p.holeCards.length >= 2) : [];
+    html += '<div style="margin-bottom:10px; font-weight:bold; color:#4a6a4a;">所有人手牌：</div>';
+    revealPlayers.forEach(p => {
+      try {
+        const wonAmt = (winners.find(w => w && w.player === p)?.amount) || 0;
+        const holeHtml = (p.holeCards || []).map(c => miniCardDiv(c)).join('');
+        const allCards = (p.holeCards || []).concat((pokerGame && pokerGame.communityCards) || []);
+        let best5Html = '';
+        let rankName = '未知';
+        if (allCards.length > 0) {
+          const evalResult = evaluateHand(allCards);
+          rankName = formatHandRank(evalResult);
+          let best5 = [];
+          if (pokerGame.getBest5Cards && allCards.length >= 5) {
+            best5 = pokerGame.getBest5Cards(p);
+          } else {
+            best5 = allCards;
+          }
+          best5Html = best5.map(c => miniCardDiv(c)).join('') || '<span style="color:#999; font-size:11px;">—</span>';
+        }
+        const isFolded = p.folded;
+        const isEliminated = p.eliminated;
+        const foldInfo = isFolded ? `<span style="margin-left:6px; color:#999; font-size:11px;">（已弃牌${p.foldRound ? ' · ' + (phaseMap[p.foldRound] || p.foldRound) : ''}）</span>` : '';
+        const elimInfo = isEliminated ? '<span style="margin-left:6px; color:#c05050; font-size:11px;">已出局</span>' : '';
+        html += `<div class="reveal-card ${wonAmt > 0 ? 'winner' : ''}" style="${isFolded ? 'opacity:0.6;' : ''}">
+          <div class="rc-name">${p.name} ${p.isHuman ? '（你）' : ''}${elimInfo}${foldInfo}${wonAmt > 0 ? '<span style="margin-left:6px; color:#4a6a4a; font-size:11px;">🏆 +' + wonAmt.toLocaleString() + '</span>' : ''}</div>
+          <div style="margin:4px 0; color:#8a8a78; font-size:11px;">底牌：</div>
+          <div class="rc-hand" style="display:flex; gap:4px; margin:4px 0;">${holeHtml}</div>
+          <div style="margin:6px 0 4px; color:#8a8a78; font-size:11px;">最佳五张：</div>
+          <div class="rc-hand" style="display:flex; gap:4px; margin:4px 0;">${best5Html}</div>
+          <div class="rc-best">牌型：<span style="color:#4a6a4a; font-weight:bold;">${rankName}</span></div>
+        </div>`;
+      } catch (perPlayerErr) {
+        console.error('showHandResult player render error:', p && p.name, perPlayerErr);
+        html += `<div style="padding:6px; color:#c05050; font-size:12px;">${p && p.name ? p.name : '未知玩家'} 数据渲染异常</div>`;
+      }
+    });
+
+    // 筹码变化
+    html += '<div style="margin-top:10px; font-weight:bold; color:#4a6a4a;">筹码变化：</div>';
+    if (pokerGame && pokerGame.players) {
+      pokerGame.players.forEach(p => {
+        if (p.eliminated) {
+          html += `<div>${p.name}：已出局</div>`;
+        } else {
+          html += `<div>${p.name}：${(p.chips || 0).toLocaleString()} 气运</div>`;
+        }
+      });
+    }
+
+    html += '</div>';
+    body.innerHTML = html;
+  } catch (e) {
+    console.error('showHandResult fatal error:', e);
+    body.innerHTML = '<div style="padding:10px;">牌局已结束，点击确认继续。</div>';
+  }
+  wrap.style.display = 'flex';
 }
 
 function endGame(won) {
@@ -715,17 +866,22 @@ async function doLoad() {
   const user = getCurrentUser();
   if (!user) return;
   showConfirm('确认读取存档', '读取其他存档将覆盖当前未保存的牌局进度，是否继续？', async () => {
-    const saves = await getSaveSlots(user.userId);
-    let html = '<div style="display:flex;flex-direction:column;gap:8px;">';
-    saves.forEach((s, i) => {
-      if (s && s.save_data) {
-        html += `<button onclick="window.location.href='battle.html?slot=${i}'" style="padding:8px;border:1px solid rgba(140,150,130,0.3);border-radius:6px;background:rgba(140,150,130,0.1);color:#2f3d36;cursor:pointer;text-align:left;font-family:inherit;">存档${i+1}：${s.save_data.playerName || '无名'} — 气运${s.save_data.chips || 0}</button>`;
-      } else {
-        html += `<div style="padding:8px;color:#666;">存档${i+1}：空空如也</div>`;
-      }
-    });
-    html += '</div>';
-    showModal('读取存档', html);
+    try {
+      const saves = await getSaveSlots(user.userId);
+      let html = '<div style="display:flex;flex-direction:column;gap:8px;">';
+      saves.forEach((s, i) => {
+        if (s && s.save_data) {
+          html += `<button onclick="window.location.href='battle.html?slot=${i}'" style="padding:8px;border:1px solid rgba(140,150,130,0.3);border-radius:6px;background:rgba(140,150,130,0.1);color:#2f3d36;cursor:pointer;text-align:left;font-family:inherit;">存档${i+1}：${s.save_data.playerName || '无名'} — 气运${s.save_data.chips || 0}</button>`;
+        } else {
+          html += `<div style="padding:8px;color:#666;">存档${i+1}：空空如也</div>`;
+        }
+      });
+      html += '</div>';
+      showModal('读取存档', html);
+    } catch (e) {
+      console.error('doLoad error:', e);
+      showModal('读取失败', '读取存档时出错：' + (e.message || '未知错误'));
+    }
   });
 }
 
