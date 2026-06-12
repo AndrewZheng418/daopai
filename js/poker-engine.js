@@ -212,6 +212,7 @@ class PokerGame {
     this.currentPlayerIndex = -1;
     this.lastRaiseIndex = -1;
     this.winners = [];
+    this.returnedBets = [];
     this.handLog = [];
   }
 
@@ -271,6 +272,7 @@ class PokerGame {
     this.currentBet = 0;
     this.minRaise = this.bigBlind;
     this.winners = [];
+    this.returnedBets = [];
     this.handLog = [];
 
     for (const p of this.players) {
@@ -482,27 +484,40 @@ class PokerGame {
     const all = this.players.filter(p => !p.eliminated).slice().sort((a, b) => a.totalBet - b.totalBet);
     let prev = 0;
     const pots = [];
+    const returnedBets = [];
     for (let i = 0; i < all.length; i++) {
       const diff = all[i].totalBet - prev;
       if (diff > 0) {
-        const eligible = all.slice(i).filter(p => !p.folded);
-        if (eligible.length > 0) {
+        const contributors = all.slice(i);
+        const eligible = contributors.filter(p => !p.folded);
+        const amount = diff * contributors.length;
+        if (contributors.length === 1 && eligible.length === 1) {
+          // No opponent matched this layer; it should be returned, not won as a side pot.
+          returnedBets.push({ player: eligible[0], amount });
+        } else if (eligible.length > 0) {
           pots.push({
-            amount: diff * (all.length - i),
-            eligiblePlayers: eligible
+            amount,
+            eligiblePlayers: eligible,
+            contributors
           });
         } else if (pots.length > 0) {
           // 若当前层级没有 eligible 玩家，将金额并入前一个 pot
-          pots[pots.length - 1].amount += diff * (all.length - i);
+          pots[pots.length - 1].amount += amount;
         }
         prev = all[i].totalBet;
       }
     }
+    this.returnedBets = returnedBets;
     return pots;
   }
 
   resolveShowdown() {
     this.sidePots = this.calculateSidePots();
+
+    for (const returned of this.returnedBets) {
+      returned.player.chips += returned.amount;
+      this.log(`${returned.player.name} 未被跟注的 ${returned.amount} ${_t('chips')} 退回`);
+    }
 
     const results = this.players.map((p, idx) => {
       if (p.folded || p.eliminated) return null;
@@ -512,7 +527,8 @@ class PokerGame {
       return { idx, player: p, ev, score: handScore(ev) };
     }).filter(r => r !== null);
 
-    for (const pot of this.sidePots) {
+    for (let potIndex = 0; potIndex < this.sidePots.length; potIndex++) {
+      const pot = this.sidePots[potIndex];
       const eligible = results.filter(r => pot.eligiblePlayers.includes(r.player));
       if (eligible.length === 0) continue;
       eligible.sort((a, b) => b.score - a.score);
@@ -523,7 +539,14 @@ class PokerGame {
       for (let w = 0; w < winners.length; w++) {
         const amt = share + (w < remainder ? 1 : 0);
         winners[w].player.chips += amt;
-        this.winners.push({ player: winners[w].player, amount: amt, evalResult: winners[w].ev });
+        this.winners.push({
+          player: winners[w].player,
+          amount: amt,
+          evalResult: winners[w].ev,
+          potIndex,
+          potAmount: pot.amount,
+          eligiblePlayers: pot.eligiblePlayers
+        });
       }
     }
 

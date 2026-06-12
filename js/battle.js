@@ -219,6 +219,10 @@ function startHand() {
     pokerGame.bigBlind = bb;
   }
 
+  pokerGame.players.forEach(p => {
+    if (!p.eliminated) p.handStartChips = p.chips;
+  });
+
   pokerGame.startNewHand();
   render();
 
@@ -373,21 +377,19 @@ function cardDiv(card, id) {
   const isRed = card.suit === '♥' || card.suit === '♦';
   const cls = isRed ? 'red' : 'black';
   const suitInfo = SUIT_NAMES[card.suit] || { name: card.suit, emoji: '' };
-  const rankInfo = RANK_NAMES[card.rank] || card.rank;
   return `<div class="dcard ${cls}"${id ? ` id="${id}"` : ''}>
     <div class="d-top">${card.rank}<br><span style="font-size:11px">${suitInfo.emoji}${suitInfo.name}</span></div>
     <div class="d-mid">${card.suit}</div>
-    <div class="d-btm">${rankInfo}</div>
+    <div class="d-btm">${card.rank}</div>
   </div>`;
 }
 
 function miniCardDiv(card) {
   const isRed = card.suit === '♥' || card.suit === '♦';
   const cls = isRed ? 'red' : 'black';
-  const rankInfo = RANK_NAMES[card.rank] || card.rank;
   return `<div class="mini-card ${cls}">
     <span class="mc-suit">${card.suit}</span>
-    <span class="mc-rank">${rankInfo}</span>
+    <span class="mc-rank">${card.rank}</span>
   </div>`;
 }
 
@@ -689,25 +691,57 @@ function showHandResult() {
     const phaseMap = { preflop: '天机晦暗', flop: '天机初现', turn: '天命流转', river: '尘埃落定', showdown: '揭晓', ended: '间歇', idle: '准备' };
     let html = '<div style="font-size:13px; line-height:1.8; color:#2f3d36;">';
 
-    // 胜出者横幅（按玩家合并 side pot 赢取金额）
     const winners = (pokerGame && pokerGame.winners) || [];
-    if (winners.length > 0) {
-      const winMap = new Map();
-      winners.forEach(w => {
-        if (!w || !w.player) return;
-        const key = w.player.id;
-        const prev = winMap.get(key);
-        if (prev) {
-          prev.amount += w.amount;
-        } else {
-          winMap.set(key, { player: w.player, amount: w.amount });
-        }
-      });
+    const returnedBets = (pokerGame && pokerGame.returnedBets) || [];
+    const winMap = new Map();
+    const returnMap = new Map();
+
+    winners.forEach(w => {
+      if (!w || !w.player) return;
+      const key = w.player.id;
+      const prev = winMap.get(key);
+      if (prev) prev.amount += w.amount;
+      else winMap.set(key, { player: w.player, amount: w.amount });
+    });
+
+    returnedBets.forEach(r => {
+      if (!r || !r.player) return;
+      returnMap.set(r.player.id, (returnMap.get(r.player.id) || 0) + r.amount);
+    });
+
+    const winnerRows = Array.from(winMap.values());
+    if (winnerRows.length > 0) {
       html += '<div style="background:rgba(140,160,120,0.15); border:1px solid rgba(100,130,90,0.35); border-radius:8px; padding:10px 14px; margin-bottom:12px; text-align:center;">';
-      winMap.forEach(w => {
+      winnerRows.forEach(w => {
         const isHuman = w.player.isHuman;
         html += `<div style="font-size:15px; font-weight:bold; color:${isHuman ? '#4a6a4a' : '#5a6b62'};">
           🏆 ${w.player.name}${isHuman ? '（你）' : ''} 夺得 ${w.amount.toLocaleString()} 气运
+        </div>`;
+      });
+      html += '</div>';
+    }
+
+    const sidePots = (pokerGame && pokerGame.sidePots) || [];
+    if (sidePots.length > 0 || returnedBets.length > 0) {
+      html += '<div style="margin-bottom:10px; font-weight:bold; color:#4a6a4a;">奖池解释：</div>';
+      html += '<div style="display:flex; flex-direction:column; gap:6px; margin-bottom:14px;">';
+      sidePots.forEach((pot, idx) => {
+        const title = idx === 0 ? '主池' : `边池 ${idx}`;
+        const eligibleNames = (pot.eligiblePlayers || []).map(p => p.name + (p.isHuman ? '（你）' : '')).join('、') || '无';
+        const potWinners = winners.filter(w => w && w.potIndex === idx);
+        const winnerText = potWinners.length > 0
+          ? potWinners.map(w => `${w.player.name}${w.player.isHuman ? '（你）' : ''} +${w.amount.toLocaleString()}`).join('、')
+          : '未产生胜者';
+        html += `<div style="padding:8px 10px; border:1px solid rgba(100,130,90,0.22); border-radius:8px; background:rgba(255,255,255,0.45);">
+          <div><b>${title}</b>：${pot.amount.toLocaleString()} 气运</div>
+          <div style="font-size:12px; color:#69766c;">可争夺者：${eligibleNames}</div>
+          <div style="font-size:12px; color:#4a6a4a;">归属：${winnerText}</div>
+        </div>`;
+      });
+      returnedBets.forEach(r => {
+        html += `<div style="padding:8px 10px; border:1px solid rgba(160,130,70,0.25); border-radius:8px; background:rgba(255,245,220,0.55);">
+          <b>未被跟注退回</b>：${r.player.name}${r.player.isHuman ? '（你）' : ''} 退回 ${r.amount.toLocaleString()} 气运
+          <div style="font-size:12px; color:#7a6a4f;">这部分筹码没有其他人匹配，不属于主池或边池奖金。</div>
         </div>`;
       });
       html += '</div>';
@@ -726,7 +760,11 @@ function showHandResult() {
     html += '<div style="margin-bottom:10px; font-weight:bold; color:#4a6a4a;">所有人手牌：</div>';
     revealPlayers.forEach(p => {
       try {
-        const wonAmt = (winners.find(w => w && w.player === p)?.amount) || 0;
+        const wonAmt = winMap.get(p.id)?.amount || 0;
+        const returnedAmt = returnMap.get(p.id) || 0;
+        const startChips = Number.isFinite(p.handStartChips) ? p.handStartChips : (p.chips + p.totalBet - wonAmt - returnedAmt);
+        const invested = p.totalBet || 0;
+        const net = p.chips - startChips;
         const holeHtml = (p.holeCards || []).map(c => miniCardDiv(c)).join('');
         const allCards = (p.holeCards || []).concat((pokerGame && pokerGame.communityCards) || []);
         let best5Html = '';
@@ -746,6 +784,8 @@ function showHandResult() {
         const isEliminated = p.eliminated;
         const foldInfo = isFolded ? `<span style="margin-left:6px; color:#999; font-size:11px;">（已弃牌${p.foldRound ? ' · ' + (phaseMap[p.foldRound] || p.foldRound) : ''}）</span>` : '';
         const elimInfo = isEliminated ? '<span style="margin-left:6px; color:#c05050; font-size:11px;">已出局</span>' : '';
+        const netText = net >= 0 ? `+${net.toLocaleString()}` : net.toLocaleString();
+        const netColor = net >= 0 ? '#4a6a4a' : '#b0554f';
         html += `<div class="reveal-card ${wonAmt > 0 ? 'winner' : ''}" style="${isFolded ? 'opacity:0.6;' : ''}">
           <div class="rc-name">${p.name} ${p.isHuman ? '（你）' : ''}${elimInfo}${foldInfo}${wonAmt > 0 ? '<span style="margin-left:6px; color:#4a6a4a; font-size:11px;">🏆 +' + wonAmt.toLocaleString() + '</span>' : ''}</div>
           <div style="margin:4px 0; color:#8a8a78; font-size:11px;">底牌：</div>
@@ -753,6 +793,9 @@ function showHandResult() {
           <div style="margin:6px 0 4px; color:#8a8a78; font-size:11px;">最佳五张：</div>
           <div class="rc-hand" style="display:flex; gap:4px; margin:4px 0;">${best5Html}</div>
           <div class="rc-best">牌型：<span style="color:#4a6a4a; font-weight:bold;">${rankName}</span></div>
+          <div style="margin-top:6px; padding-top:6px; border-top:1px dashed rgba(100,130,90,0.25); font-size:12px; color:#5c675f;">
+            起始 ${startChips.toLocaleString()} ｜ 投入 ${invested.toLocaleString()} ｜ 赢得 ${wonAmt.toLocaleString()} ｜ 退回 ${returnedAmt.toLocaleString()} ｜ 净变化 <span style="color:${netColor}; font-weight:bold;">${netText}</span> ｜ 剩余 ${(p.chips || 0).toLocaleString()}
+          </div>
         </div>`;
       } catch (perPlayerErr) {
         console.error('showHandResult player render error:', p && p.name, perPlayerErr);
@@ -761,7 +804,7 @@ function showHandResult() {
     });
 
     // 筹码变化
-    html += '<div style="margin-top:10px; font-weight:bold; color:#4a6a4a;">筹码变化：</div>';
+    html += '<div style="margin-top:10px; font-weight:bold; color:#4a6a4a;">本局后筹码：</div>';
     if (pokerGame && pokerGame.players) {
       pokerGame.players.forEach(p => {
         if (p.eliminated) {
