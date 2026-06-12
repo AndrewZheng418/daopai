@@ -197,6 +197,7 @@ function createPlayers() {
     const aiDiff = diff === 'easy' ? 'easy' : (diff === 'hard' ? 'hard' : 'normal');
     const p = new Player('p' + (i + 1), n, startChips);
     p.difficulty = aiDiff;
+    p.aiProfile = typeof createAIProfile === 'function' ? createAIProfile(aiDiff) : null;
     return p;
   });
   return [human, ...ais];
@@ -311,9 +312,10 @@ function render() {
       lastRenderedBets['s' + i] = newBet;
     }
     const statusEl = seat.querySelector('.seat-status');
-    if (p.folded) statusEl.textContent = '已遁走';
-    else if (p.allIn) statusEl.textContent = '破釜沉舟';
-    else statusEl.textContent = '等待中';
+    const profileLabel = p.aiProfile ? ` · ${p.aiProfile.label}` : '';
+    if (p.folded) statusEl.textContent = '已遁走' + profileLabel;
+    else if (p.allIn) statusEl.textContent = '破釜沉舟' + profileLabel;
+    else statusEl.textContent = '等待中' + profileLabel;
 
     seat.classList.toggle('folded', p.folded);
     seat.classList.toggle('allin', p.allIn && !p.folded);
@@ -506,7 +508,7 @@ function scheduleAI() {
   if (!p || p.isHuman) return;
 
   const diff = p.difficulty || 'normal';
-  let delay = 1000 + Math.random() * 1000; // 1~2秒
+  let delay = 350 + Math.random() * 550; // 0.35~0.9秒，避免多人连续行动拖太久
 
   // 垃圾话概率：简单15%、普通25%、困难35%
   const trashProb = { easy: 0.15, normal: 0.25, hard: 0.35 };
@@ -543,7 +545,7 @@ function scheduleAI() {
     const lines = linesByDiff[diff] || linesByDiff.normal;
     const line = lines[Math.floor(Math.random() * lines.length)];
     addLogLine(`<span style="color:#c87860">[${p.name}] ${line}</span>`);
-    delay = 1000 + Math.random() * 2000; // 说话 1~3秒
+    delay = 800 + Math.random() * 400; // 有台词也不超过约1.2秒
   }
 
   autoPlayTimer = setTimeout(() => {
