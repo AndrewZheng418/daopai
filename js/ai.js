@@ -4,43 +4,43 @@
 const AI_PROFILES = {
   TAG: {
     label: '紧凶',
-    tightness: 70,
-    aggression: 80,
-    bluff: 18,
-    allInCall: 76,
-    callBias: 42
+    tightness: [62, 78],
+    aggression: [70, 90],
+    bluff: [16, 32],
+    allInCall: [76, 84],
+    callBias: [42, 58]
   },
   LAG: {
     label: '松凶',
-    tightness: 40,
-    aggression: 85,
-    bluff: 38,
-    allInCall: 68,
-    callBias: 45
+    tightness: [30, 50],
+    aggression: [78, 95],
+    bluff: [34, 58],
+    allInCall: [68, 78],
+    callBias: [48, 66]
   },
   NIT: {
     label: '岩石',
-    tightness: 90,
-    aggression: 30,
-    bluff: 4,
-    allInCall: 88,
-    callBias: 24
+    tightness: [82, 95],
+    aggression: [20, 45],
+    bluff: [2, 10],
+    allInCall: [88, 94],
+    callBias: [18, 32]
   },
   FISH: {
     label: '鱼',
-    tightness: 60,
-    aggression: 20,
-    bluff: 8,
-    allInCall: 62,
-    callBias: 70
+    tightness: [45, 70],
+    aggression: [15, 45],
+    bluff: [10, 28],
+    allInCall: [60, 70],
+    callBias: [68, 88]
   },
   BALANCED: {
     label: '均衡',
-    tightness: 55,
-    aggression: 55,
-    bluff: 16,
-    allInCall: 72,
-    callBias: 48
+    tightness: [48, 62],
+    aggression: [45, 68],
+    bluff: [14, 30],
+    allInCall: [72, 82],
+    callBias: [46, 62]
   }
 };
 
@@ -51,9 +51,10 @@ const AI_PROFILE_WEIGHTS = {
     ['NIT', 10]
   ],
   normal: [
-    ['TAG', 60],
-    ['NIT', 25],
-    ['BALANCED', 15]
+    ['TAG', 45],
+    ['BALANCED', 30],
+    ['LAG', 15],
+    ['NIT', 10]
   ],
   hard: [
     ['TAG', 45],
@@ -72,16 +73,35 @@ function pickWeighted(items) {
   return items[items.length - 1][0];
 }
 
+function rollRange(value) {
+  if (!Array.isArray(value)) return value;
+  const [min, max] = value;
+  return Math.round(min + Math.random() * (max - min));
+}
+
+function materializeProfile(key) {
+  const base = AI_PROFILES[key] || AI_PROFILES.BALANCED;
+  return {
+    key,
+    label: base.label,
+    tightness: rollRange(base.tightness),
+    aggression: rollRange(base.aggression),
+    bluff: rollRange(base.bluff),
+    allInCall: rollRange(base.allInCall),
+    callBias: rollRange(base.callBias)
+  };
+}
+
 function createAIProfile(difficulty = 'normal') {
   const weights = AI_PROFILE_WEIGHTS[difficulty] || AI_PROFILE_WEIGHTS.normal;
   const key = pickWeighted(weights);
-  return { key, ...AI_PROFILES[key] };
+  return materializeProfile(key);
 }
 
 function getAIProfile(player, difficulty = 'normal') {
   if (player && player.aiProfile) return player.aiProfile;
-  const fallback = difficulty === 'easy' ? AI_PROFILES.FISH : (difficulty === 'hard' ? AI_PROFILES.LAG : AI_PROFILES.TAG);
-  return { key: difficulty || 'normal', ...fallback };
+  const fallbackKey = difficulty === 'easy' ? 'FISH' : (difficulty === 'hard' ? 'LAG' : 'TAG');
+  return materializeProfile(fallbackKey);
 }
 
 function clamp01(value) {
@@ -149,9 +169,9 @@ function decideAction(game, player, difficulty) {
   const bluff = profile.bluff / 100;
   const callBias = profile.callBias / 100;
 
-  const entryThreshold = 0.18 + tightness * 0.42;
-  const callThreshold = Math.max(0.16, entryThreshold - callBias * 0.16);
-  const raiseThreshold = 0.46 + tightness * 0.16 - aggression * 0.12;
+  const entryThreshold = 0.14 + tightness * 0.34;
+  const callThreshold = Math.max(0.12, entryThreshold - callBias * 0.20);
+  const raiseThreshold = 0.44 + tightness * 0.14 - aggression * 0.12;
 
   if (toCall >= player.chips) {
     const activeOpponents = game.players.filter(p => p !== player && !p.folded && !p.eliminated).length;
@@ -161,7 +181,7 @@ function decideAction(game, player, difficulty) {
   }
 
   if (toCall === 0) {
-    const bluffRaise = effective < entryThreshold && Math.random() < bluff * 0.25;
+    const bluffRaise = effective < entryThreshold && Math.random() < bluff * 0.38;
     if ((effective >= raiseThreshold && Math.random() < aggression) || bluffRaise) {
       const raiseAmt = game.currentBet + game.minRaise + Math.floor(Math.random() * game.minRaise * 2);
       return { action: 'raise', amount: Math.min(raiseAmt, player.chips + player.currentBet) };
@@ -170,10 +190,12 @@ function decideAction(game, player, difficulty) {
   }
 
   const pressure = Math.min(1, toCall / Math.max(1, player.chips + player.currentBet));
-  const pressuredCallThreshold = callThreshold + pressure * (0.16 + tightness * 0.14);
+  const pressuredCallThreshold = callThreshold + pressure * (0.12 + tightness * 0.12);
 
   if (effective < pressuredCallThreshold) {
-    if (profile.key === 'LAG' && Math.random() < bluff * 0.22 && pressure < 0.35) {
+    const canBluffRaise = (profile.key === 'LAG' || profile.key === 'TAG' || profile.key === 'BALANCED') && pressure < 0.35;
+    const bluffRaiseRate = profile.key === 'LAG' ? bluff * 0.34 : bluff * 0.16;
+    if (canBluffRaise && Math.random() < bluffRaiseRate) {
       const raiseAmt = game.currentBet + game.minRaise * (1 + Math.floor(Math.random() * 3));
       return { action: 'raise', amount: Math.min(raiseAmt, player.chips + player.currentBet) };
     }

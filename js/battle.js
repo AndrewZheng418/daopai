@@ -312,10 +312,9 @@ function render() {
       lastRenderedBets['s' + i] = newBet;
     }
     const statusEl = seat.querySelector('.seat-status');
-    const profileLabel = p.aiProfile ? ` · ${p.aiProfile.label}` : '';
-    if (p.folded) statusEl.textContent = '已遁走' + profileLabel;
-    else if (p.allIn) statusEl.textContent = '破釜沉舟' + profileLabel;
-    else statusEl.textContent = '等待中' + profileLabel;
+    if (p.folded) statusEl.textContent = '已遁走';
+    else if (p.allIn) statusEl.textContent = '破釜沉舟';
+    else statusEl.textContent = '等待中';
 
     seat.classList.toggle('folded', p.folded);
     seat.classList.toggle('allin', p.allIn && !p.folded);
