@@ -38,6 +38,19 @@
   </div>
 </div>
 
+<!-- 逐人揭晓 -->
+<div class="hand-reveal-wrap" id="handRevealWrap" style="display:none;">
+  <div class="page-wrap" style="max-width: 560px;">
+    <h2>逐人揭晓</h2>
+    <div id="handRevealBody" style="max-height:50vh; overflow-y:auto; margin:10px 0;"></div>
+    <div class="reveal-actions">
+      <button class="btn-primary" id="btn-next-reveal">展示下一个人（10）</button>
+      <button class="btn-secondary" id="btn-skip-reveal">直接结算</button>
+    </div>
+    <p class="reveal-note">测试版本为便于理解，会展示所有参与者手牌；正规德扑中，已弃牌玩家通常不会公开底牌。</p>
+  </div>
+</div>
+
 <!-- 牌局结算 -->
 <div class="hand-result-wrap" id="handResultWrap" style="display:none;">
   <div class="page-wrap" style="max-width: 560px;">
@@ -260,6 +273,8 @@
         <div class="dcard-back" id="pCard2"></div>
       </div>
     </div>
+
+    <div class="action-context" id="actionContext">需跟 0 ｜ 气运池 0 ｜ 跟注后最多可赢 0</div>
 
     <!-- 操作按钮 -->
     <div class="action-bar">
