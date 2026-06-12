@@ -487,6 +487,21 @@ body {
 }
 
 /* ===== 操作按钮区 ===== */
+.action-context {
+  position: absolute;
+  bottom: 58px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  padding: 5px 14px;
+  border: 1px solid rgba(100, 130, 90, 0.22);
+  border-radius: 999px;
+  background: rgba(240, 237, 228, 0.82);
+  color: #5a6b62;
+  font-size: 12px;
+  white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(45, 60, 50, 0.08);
+}
 .action-bar {
   position: absolute;
   bottom: 8px;
@@ -577,6 +592,36 @@ body {
   font-size: 12px;
   line-height: 1.8;
   color: #6a7a62;
+}
+
+.hand-reveal-wrap {
+  position: fixed;
+  inset: 0;
+  background: rgba(60, 65, 55, 0.35);
+  display: none;
+  justify-content: center;
+  align-items: center;
+  z-index: 60;
+}
+.reveal-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+.reveal-note {
+  margin: 10px 0 0;
+  color: #8a7a62;
+  font-size: 12px;
+  line-height: 1.7;
+  text-align: center;
+}
+.reveal-focus-card {
+  border: 1px solid rgba(100,130,90,0.28);
+  border-radius: 10px;
+  padding: 12px;
+  background: rgba(255,255,255,0.42);
 }
 
 /* ===== 底部阶段切换 ===== */
@@ -672,6 +717,7 @@ body {
   .player-info-bar .pin-name { font-size: 13px; }
   .player-info-bar .pin-chips { font-size: 12px; }
 
+  .action-context { bottom: 92px; max-width: 92%; overflow: hidden; text-overflow: ellipsis; font-size: 10px; }
   .action-bar { gap: 5px; width: 96%; justify-content: center; bottom: 48px; }
   .act-btn { padding: 8px 6px; font-size: 11px; min-width: 52px; }
   .act-btn .act-sub { font-size: 8px; }

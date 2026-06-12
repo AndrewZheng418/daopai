@@ -60,6 +60,7 @@ class Player {
     this.totalBet = 0;   // this entire hand
     this.difficulty = 'normal'; // for AI
     this.bestHand = null; // evaluated at showdown
+    this.actedThisRound = false;
   }
 
   resetForNewHand() {
@@ -69,6 +70,7 @@ class Player {
     this.currentBet = 0;
     this.totalBet = 0;
     this.bestHand = null;
+    this.actedThisRound = false;
   }
 
   bet(amount) {
@@ -239,6 +241,19 @@ class PokerGame {
     return this.players.filter(p => p.canAct);
   }
 
+  bettingRoundComplete() {
+    const actors = this.canActPlayers();
+    if (actors.length === 0) return true;
+    return actors.every(p => p.actedThisRound && p.currentBet === this.currentBet);
+  }
+
+  resetRoundActionAfterFullRaise(raiser) {
+    for (const p of this.players) {
+      if (p.canAct && p !== raiser) p.actedThisRound = false;
+    }
+    raiser.actedThisRound = true;
+  }
+
   getNextActiveIndex(fromIndex) {
     let idx = (fromIndex + 1) % this.players.length;
     let loops = 0;
@@ -294,9 +309,10 @@ class PokerGame {
       this.dealerIndex = (this.dealerIndex + 1) % this.players.length;
     }
 
-    const sbIdx = this.getNextActiveIndex(this.dealerIndex);
+    const headsUp = active.length === 2;
+    const sbIdx = headsUp ? this.dealerIndex : this.getNextActiveIndex(this.dealerIndex);
     const bbIdx = this.getNextActiveIndex(sbIdx);
-    const firstToAct = this.getNextActiveIndex(bbIdx);
+    const firstToAct = headsUp ? sbIdx : this.getNextActiveIndex(bbIdx);
 
     if (sbIdx === -1 || bbIdx === -1 || firstToAct === -1) {
       this.state = 'ended';
@@ -329,6 +345,7 @@ class PokerGame {
   endBettingRound() {
     for (const p of this.players) {
       p.currentBet = 0;
+      p.actedThisRound = false;
     }
     this.currentBet = 0;
     this.minRaise = this.bigBlind;
@@ -367,6 +384,7 @@ class PokerGame {
     if (this.players[this.currentPlayerIndex] !== player) return false;
 
     const toCall = this.currentBet - player.currentBet;
+    let fullRaise = false;
 
     switch (action) {
       case 'fold':
@@ -397,9 +415,12 @@ class PokerGame {
         const newTotal = player.currentBet;
         if (newTotal > this.currentBet) {
           const diff = newTotal - this.currentBet;
-          if (diff >= this.minRaise) this.minRaise = diff;
           this.currentBet = newTotal;
-          this.lastRaiseIndex = this.currentPlayerIndex;
+          if (diff >= this.minRaise) {
+            this.minRaise = diff;
+            this.lastRaiseIndex = this.currentPlayerIndex;
+            fullRaise = true;
+          }
         }
         this.pot += actual;
         this.log(`${player.name} ${_t('raise')} 至 ${newTotal} ${_t('chips')}`);
@@ -412,9 +433,12 @@ class PokerGame {
         const newTotal = player.currentBet;
         if (newTotal > this.currentBet) {
           const diff = newTotal - this.currentBet;
-          if (diff >= this.minRaise) this.minRaise = diff;
           this.currentBet = newTotal;
-          this.lastRaiseIndex = this.currentPlayerIndex;
+          if (diff >= this.minRaise) {
+            this.minRaise = diff;
+            this.lastRaiseIndex = this.currentPlayerIndex;
+            fullRaise = true;
+          }
         }
         this.pot += actual;
         this.log(`${player.name} ${_t('allIn')} ${actual} ${_t('chips')}`);
@@ -425,15 +449,25 @@ class PokerGame {
         return false;
     }
 
+    if (fullRaise) {
+      this.resetRoundActionAfterFullRaise(player);
+    } else {
+      player.actedThisRound = true;
+    }
+
     const notFolded = this.nonFoldedPlayers();
     if (notFolded.length === 1) {
       this.endHand(notFolded[0]);
       return true;
     }
 
-    const canAct = this.canActPlayers();
-    if (canAct.length === 0) {
+    if (this.canActPlayers().length === 0) {
       this.fastForwardToShowdown();
+      return true;
+    }
+
+    if (this.bettingRoundComplete()) {
+      this.endBettingRound();
       return true;
     }
 
@@ -442,21 +476,12 @@ class PokerGame {
   }
 
   advanceToNextPlayer() {
-    const start = this.currentPlayerIndex;
     let safety = 0;
-    while (safety < this.players.length * 2) {
+    while (safety < this.players.length) {
       this.currentPlayerIndex = (this.currentPlayerIndex + 1) % this.players.length;
       const p = this.players[this.currentPlayerIndex];
       if (!p.eliminated && !p.folded && !p.allIn && p.chips > 0) {
-        if (this.currentPlayerIndex === this.lastRaiseIndex) {
-          this.endBettingRound();
-          return;
-        }
-        return;
-      }
-      if (this.currentPlayerIndex === this.lastRaiseIndex) {
-        this.endBettingRound();
-        return;
+        if (!p.actedThisRound || p.currentBet < this.currentBet) return;
       }
       safety++;
     }

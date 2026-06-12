@@ -8,6 +8,9 @@ let autoPlayTimer = null;
 let lastTickTime = Date.now();
 let tickInterval = null;
 let handEndedHandled = false;
+let revealState = { active: false, index: 0 };
+let revealTimer = null;
+let revealCountdown = 10;
 
 // AI 垃圾话控制：每个行动轮次（preflop/flop/turn/river）最多说一次
 let trashTalkState = { round: '', talkers: new Set() };
@@ -108,8 +111,11 @@ async function init() {
 
   // 最佳手牌按钮
   document.getElementById('btn-best-hand').addEventListener('click', toggleBestHandHighlight);
+  document.getElementById('btn-next-reveal').addEventListener('click', nextRevealPlayer);
+  document.getElementById('btn-skip-reveal').addEventListener('click', skipRevealToResult);
 
   document.getElementById('btn-confirm-hand').addEventListener('click', () => {
+    clearRevealTimer();
     document.getElementById('handResultWrap').style.display = 'none';
 
     const alive = pokerGame.players.filter(p => !p.eliminated);
@@ -125,6 +131,7 @@ async function init() {
     // 正常进入间歇，局数+1
     saveData.round = (saveData.round || 1) + 1;
     saveData.status = '牌局间歇';
+    delete saveData.pokerSnapshot;
     const user = getCurrentUser();
     if (user) saveToSlot(user.userId, saveSlot + 1, saveData);
     showIntermission();
@@ -140,20 +147,55 @@ async function init() {
     el.addEventListener('click', () => showSkillModal());
   });
 
-  // 进入间歇
-  showIntermission();
+  if (saveData.pokerSnapshot && restorePokerSnapshot(saveData.pokerSnapshot)) {
+    resumeFromSnapshot(saveData.pokerSnapshot.uiMode);
+  } else {
+    showIntermission();
+  }
 }
 
 function showIntermission() {
+  clearRevealTimer();
   document.getElementById('arenaWrap').style.display = 'none';
   document.getElementById('intermissionWrap').style.display = 'flex';
+  document.getElementById('handRevealWrap').style.display = 'none';
   document.getElementById('handResultWrap').style.display = 'none';
   updateIntermissionUI();
 }
 
 function hideIntermission() {
   document.getElementById('intermissionWrap').style.display = 'none';
+  document.getElementById('handRevealWrap').style.display = 'none';
   document.getElementById('arenaWrap').style.display = 'block';
+}
+
+function resumeFromSnapshot(uiMode = 'arena') {
+  clearTimeout(autoPlayTimer);
+  clearRevealTimer();
+  handEndedHandled = pokerGame && (pokerGame.state === 'ended' || pokerGame.state === 'showdown');
+  saveData.status = uiMode === 'reveal' ? '逐人揭晓' : (uiMode === 'result' ? '牌局结算' : '牌局进行中');
+
+  document.getElementById('intermissionWrap').style.display = 'none';
+  document.getElementById('endingWrap').style.display = 'none';
+
+  if (uiMode === 'reveal') {
+    document.getElementById('arenaWrap').style.display = 'none';
+    startRevealSequence(revealState.index || 0);
+    return;
+  }
+
+  if (uiMode === 'result' || pokerGame.state === 'ended' || pokerGame.state === 'showdown') {
+    document.getElementById('arenaWrap').style.display = 'none';
+    document.getElementById('handRevealWrap').style.display = 'none';
+    showHandResult();
+    return;
+  }
+
+  document.getElementById('handRevealWrap').style.display = 'none';
+  document.getElementById('handResultWrap').style.display = 'none';
+  document.getElementById('arenaWrap').style.display = 'block';
+  render();
+  if (pokerGame.currentPlayer && !pokerGame.currentPlayer.isHuman) scheduleAI();
 }
 
 function updateIntermissionUI() {
@@ -201,6 +243,132 @@ function createPlayers() {
     return p;
   });
   return [human, ...ais];
+}
+
+function serializeCard(card) {
+  return card ? { suit: card.suit, rank: card.rank } : null;
+}
+
+function deserializeCard(data) {
+  return data ? new Card(data.suit, data.rank) : null;
+}
+
+function serializePlayer(p) {
+  return {
+    id: p.id,
+    name: p.name,
+    chips: p.chips,
+    isHuman: p.isHuman,
+    holeCards: (p.holeCards || []).map(serializeCard),
+    folded: p.folded,
+    foldRound: p.foldRound || null,
+    allIn: p.allIn,
+    eliminated: p.eliminated,
+    currentBet: p.currentBet || 0,
+    totalBet: p.totalBet || 0,
+    difficulty: p.difficulty || 'normal',
+    aiProfile: p.aiProfile || null,
+    handStartChips: p.handStartChips,
+    actedThisRound: !!p.actedThisRound
+  };
+}
+
+function deserializePlayer(data) {
+  const p = new Player(data.id, data.name, data.chips, data.isHuman);
+  p.holeCards = (data.holeCards || []).map(deserializeCard).filter(Boolean);
+  p.folded = !!data.folded;
+  p.foldRound = data.foldRound || null;
+  p.allIn = !!data.allIn;
+  p.eliminated = !!data.eliminated;
+  p.currentBet = data.currentBet || 0;
+  p.totalBet = data.totalBet || 0;
+  p.difficulty = data.difficulty || 'normal';
+  p.aiProfile = data.aiProfile || null;
+  p.handStartChips = data.handStartChips;
+  p.actedThisRound = !!data.actedThisRound;
+  return p;
+}
+
+function createPokerSnapshot(uiMode = 'arena') {
+  if (!pokerGame) return null;
+  return {
+    snapshotVersion: 1,
+    uiMode,
+    revealState: { ...revealState },
+    deck: (pokerGame.deck?.cards || []).map(serializeCard),
+    players: pokerGame.players.map(serializePlayer),
+    communityCards: (pokerGame.communityCards || []).map(serializeCard),
+    pot: pokerGame.pot || 0,
+    sidePots: (pokerGame.sidePots || []).map(pot => ({
+      amount: pot.amount,
+      eligibleIds: (pot.eligiblePlayers || []).map(p => p.id),
+      contributorIds: (pot.contributors || []).map(p => p.id)
+    })),
+    returnedBets: (pokerGame.returnedBets || []).map(r => ({ playerId: r.player?.id, amount: r.amount })),
+    state: pokerGame.state,
+    dealerIndex: pokerGame.dealerIndex,
+    smallBlind: pokerGame.smallBlind,
+    bigBlind: pokerGame.bigBlind,
+    minRaise: pokerGame.minRaise,
+    currentBet: pokerGame.currentBet,
+    currentPlayerIndex: pokerGame.currentPlayerIndex,
+    lastRaiseIndex: pokerGame.lastRaiseIndex,
+    winners: (pokerGame.winners || []).map(w => ({
+      playerId: w.player?.id,
+      amount: w.amount,
+      potIndex: w.potIndex,
+      potAmount: w.potAmount,
+      eligibleIds: (w.eligiblePlayers || []).map(p => p.id),
+      evalResult: w.evalResult || null
+    })),
+    handLog: (pokerGame.handLog || []).slice()
+  };
+}
+
+function restorePokerSnapshot(snapshot) {
+  if (!snapshot || snapshot.snapshotVersion !== 1) return false;
+
+  const players = (snapshot.players || []).map(deserializePlayer);
+  const game = new PokerGame(players, snapshot.smallBlind || 100, snapshot.bigBlind || 200);
+  const playerById = new Map(players.map(p => [p.id, p]));
+
+  game.deck.cards = (snapshot.deck || []).map(deserializeCard).filter(Boolean);
+  game.communityCards = (snapshot.communityCards || []).map(deserializeCard).filter(Boolean);
+  game.pot = snapshot.pot || 0;
+  game.state = snapshot.state || 'idle';
+  game.dealerIndex = snapshot.dealerIndex || 0;
+  game.minRaise = snapshot.minRaise || game.bigBlind;
+  game.currentBet = snapshot.currentBet || 0;
+  game.currentPlayerIndex = Number.isInteger(snapshot.currentPlayerIndex) ? snapshot.currentPlayerIndex : -1;
+  game.lastRaiseIndex = Number.isInteger(snapshot.lastRaiseIndex) ? snapshot.lastRaiseIndex : -1;
+  game.handLog = (snapshot.handLog || []).slice();
+  game.sidePots = (snapshot.sidePots || []).map(pot => ({
+    amount: pot.amount || 0,
+    eligiblePlayers: (pot.eligibleIds || []).map(id => playerById.get(id)).filter(Boolean),
+    contributors: (pot.contributorIds || []).map(id => playerById.get(id)).filter(Boolean)
+  }));
+  game.returnedBets = (snapshot.returnedBets || []).map(r => ({
+    player: playerById.get(r.playerId),
+    amount: r.amount || 0
+  })).filter(r => r.player);
+  game.winners = (snapshot.winners || []).map(w => ({
+    player: playerById.get(w.playerId),
+    amount: w.amount || 0,
+    potIndex: w.potIndex,
+    potAmount: w.potAmount,
+    eligiblePlayers: (w.eligibleIds || []).map(id => playerById.get(id)).filter(Boolean),
+    evalResult: w.evalResult || null
+  })).filter(w => w.player);
+
+  pokerGame = game;
+  revealState = snapshot.revealState || { active: false, index: 0 };
+  return true;
+}
+
+function persistCurrentSnapshot(uiMode) {
+  if (!saveData) return;
+  const snapshot = createPokerSnapshot(uiMode);
+  if (snapshot) saveData.pokerSnapshot = snapshot;
 }
 
 function startHand() {
@@ -394,6 +562,31 @@ function miniCardDiv(card) {
   </div>`;
 }
 
+function estimateMaxWinAfterCall(player, toCall) {
+  if (!pokerGame || !player) return 0;
+  const callAmount = Math.min(Math.max(0, toCall), player.chips);
+  const playerContribution = player.totalBet + callAmount;
+  return pokerGame.players
+    .filter(p => !p.eliminated)
+    .reduce((sum, p) => {
+      const contribution = p === player ? playerContribution : (p.totalBet || 0);
+      return sum + Math.min(contribution, playerContribution);
+    }, 0);
+}
+
+function updateActionContext() {
+  const ctx = document.getElementById('actionContext');
+  if (!ctx || !pokerGame) return;
+  const hp = pokerGame.humanPlayer;
+  if (!hp) {
+    ctx.textContent = `气运池 ${pokerGame.pot.toLocaleString()}`;
+    return;
+  }
+  const toCall = Math.max(0, pokerGame.currentBet - hp.currentBet);
+  const maxWin = estimateMaxWinAfterCall(hp, toCall);
+  ctx.textContent = `需跟 ${toCall.toLocaleString()} ｜ 气运池 ${pokerGame.pot.toLocaleString()} ｜ 跟注后最多可赢 ${maxWin.toLocaleString()}`;
+}
+
 function renderActionButtons() {
   const hp = pokerGame.humanPlayer;
   const btnFold = document.getElementById('btn-fold');
@@ -402,6 +595,7 @@ function renderActionButtons() {
   const btnRaise = document.getElementById('btn-raise');
   const btnAllin = document.getElementById('btn-allin');
   const btnSkip = document.getElementById('btn-skip-hand');
+  updateActionContext();
 
   // 若已遁走且牌局仍在进行，显示跳过按钮
   if (hp && hp.folded && !hp.eliminated && pokerGame.state !== 'showdown' && pokerGame.state !== 'ended' && pokerGame.state !== 'idle') {
@@ -436,7 +630,7 @@ function renderActionButtons() {
   }
 
   const minR = pokerGame.currentBet + pokerGame.minRaise;
-  btnRaise.disabled = hp.chips <= toCall;
+  btnRaise.disabled = hp.chips <= toCall || (hp.chips + hp.currentBet) < minR;
   btnRaise.querySelector('.act-sub').textContent = `逆天 (最低 ${minR.toLocaleString()})`;
 
   const rInput = document.getElementById('raiseInput');
@@ -456,17 +650,64 @@ function skipToHandEnd() {
   }
 }
 
+function confirmAllInOnce(hp) {
+  if (sessionStorage.getItem('daopai_skip_allin_confirm') === '1') {
+    humanAction('allin-confirmed');
+    return;
+  }
+
+  const box = document.createElement('div');
+  box.innerHTML = `
+    <p style="margin-bottom:12px;">确定要投入全部剩余气运 ${hp.chips.toLocaleString()} 吗？</p>
+    <label style="display:flex; align-items:center; gap:8px; margin:8px 0 16px; color:#5a6b62; font-size:12px; cursor:pointer;">
+      <input type="checkbox" id="skipAllInConfirmThisSession">
+      本次登录不再提示
+    </label>
+  `;
+
+  const btns = document.createElement('div');
+  btns.style.cssText = 'display:flex;gap:10px;justify-content:center;';
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.textContent = '取消';
+  cancelBtn.style.cssText = 'padding:6px 18px;border:1px solid rgba(140,150,130,0.3);border-radius:6px;background:rgba(140,150,130,0.1);color:#2f3d36;font-family:inherit;cursor:pointer;';
+  cancelBtn.onclick = closeModal;
+
+  const okBtn = document.createElement('button');
+  okBtn.textContent = '确认全下';
+  okBtn.style.cssText = 'padding:6px 18px;border:1px solid rgba(130,150,110,0.5);border-radius:6px;background:rgba(140,150,130,0.25);color:#4a6a4a;font-family:inherit;cursor:pointer;';
+  okBtn.onclick = function() {
+    const skip = document.getElementById('skipAllInConfirmThisSession');
+    if (skip && skip.checked) {
+      sessionStorage.setItem('daopai_skip_allin_confirm', '1');
+    }
+    closeModal();
+    humanAction('allin-confirmed');
+  };
+
+  btns.appendChild(cancelBtn);
+  btns.appendChild(okBtn);
+  box.appendChild(btns);
+  showModal('确认本源全倾', box);
+}
+
 function humanAction(action) {
   if (!pokerGame) return;
   const hp = pokerGame.humanPlayer;
   if (!hp || pokerGame.currentPlayer !== hp) return;
 
+  if (action === 'allin') {
+    confirmAllInOnce(hp);
+    return;
+  }
+
+  const engineAction = action === 'allin-confirmed' ? 'allin' : action;
   let amount = 0;
-  if (action === 'raise') {
+  if (engineAction === 'raise') {
     amount = parseInt(document.getElementById('raiseInput').value) || 0;
   }
 
-  const ok = pokerGame.playerAction(hp, action, amount);
+  const ok = pokerGame.playerAction(hp, engineAction, amount);
   if (!ok) return;
   render();
 
@@ -605,14 +846,7 @@ function onHandEnded() {
     }
   });
 
-  // 揭示所有人手牌和牌型
-  try {
-    showHandResult();
-  } catch (e) {
-    console.error('showHandResult error:', e);
-    document.getElementById('handResultBody').innerHTML = '<div style="padding:10px;">牌局已结束，点击确认继续。</div>';
-    document.getElementById('handResultWrap').style.display = 'flex';
-  }
+  startRevealSequence(0);
 
   // 检查结局条件（死亡结算延后到玩家确认后）
   const alive = pokerGame.players.filter(p => !p.eliminated);
@@ -631,7 +865,127 @@ function onHandEnded() {
 
   // 保存当前进度（不立即跳转）
   const user = getCurrentUser();
+  persistCurrentSnapshot('reveal');
   if (user) saveToSlot(user.userId, saveSlot + 1, saveData);
+}
+
+function clearRevealTimer() {
+  if (revealTimer) {
+    clearInterval(revealTimer);
+    revealTimer = null;
+  }
+}
+
+function getRevealPlayers() {
+  if (!pokerGame) return [];
+  return pokerGame.players
+    .filter(p => p.holeCards && p.holeCards.length >= 2)
+    .sort((a, b) => {
+      if (a.folded !== b.folded) return a.folded ? 1 : -1;
+      return pokerGame.players.indexOf(a) - pokerGame.players.indexOf(b);
+    });
+}
+
+function revealCardDiv(card, bestSet) {
+  const isRed = card.suit === '♥' || card.suit === '♦';
+  const cls = isRed ? 'red' : 'black';
+  const highlight = bestSet && bestSet.has(card) ? ' style="box-shadow:0 0 0 2px rgba(190,150,70,0.8); transform:translateY(-2px);"' : '';
+  return `<div class="mini-card ${cls}"${highlight}>
+    <span class="mc-suit">${card.suit}</span>
+    <span class="mc-rank">${card.rank}</span>
+  </div>`;
+}
+
+function startRevealCountdown() {
+  clearRevealTimer();
+  revealCountdown = 10;
+  const btn = document.getElementById('btn-next-reveal');
+  const update = () => {
+    if (btn) btn.textContent = `展示下一个人（${revealCountdown}）`;
+  };
+  update();
+  revealTimer = setInterval(() => {
+    revealCountdown -= 1;
+    update();
+    if (revealCountdown <= 0) nextRevealPlayer();
+  }, 1000);
+}
+
+function startRevealSequence(index = 0) {
+  clearRevealTimer();
+  const players = getRevealPlayers();
+  revealState = { active: true, index: Math.min(Math.max(0, index), Math.max(0, players.length - 1)) };
+  saveData.status = '逐人揭晓';
+  persistCurrentSnapshot('reveal');
+
+  document.getElementById('arenaWrap').style.display = 'none';
+  document.getElementById('intermissionWrap').style.display = 'none';
+  document.getElementById('handResultWrap').style.display = 'none';
+  document.getElementById('handRevealWrap').style.display = 'flex';
+
+  renderRevealCurrent();
+}
+
+function renderRevealCurrent() {
+  const body = document.getElementById('handRevealBody');
+  const players = getRevealPlayers();
+  if (!body || players.length === 0) {
+    skipRevealToResult();
+    return;
+  }
+
+  const p = players[revealState.index] || players[players.length - 1];
+  const allCards = (p.holeCards || []).concat((pokerGame && pokerGame.communityCards) || []);
+  const evalResult = allCards.length >= 5 ? evaluateHand(allCards) : null;
+  const rankName = evalResult ? formatHandRank(evalResult) : '未知';
+  const best5 = (pokerGame.getBest5Cards && allCards.length >= 5) ? pokerGame.getBest5Cards(p) : allCards;
+  const bestSet = new Set(best5);
+  const statusText = p.folded ? `已弃牌${p.foldRound ? ' · ' + p.foldRound : ''}` : (p.allIn ? '全下' : '参与摊牌');
+  const communityHtml = (pokerGame.communityCards || []).map(c => revealCardDiv(c, bestSet)).join('');
+  const holeHtml = (p.holeCards || []).map(c => revealCardDiv(c, bestSet)).join('');
+  const bestHtml = best5.map(c => revealCardDiv(c, bestSet)).join('');
+
+  body.innerHTML = `
+    <div class="reveal-focus-card">
+      <div style="display:flex; justify-content:space-between; gap:10px; align-items:center; margin-bottom:8px;">
+        <div style="font-size:16px; font-weight:bold; color:#4a6a4a;">${p.name}${p.isHuman ? '（你）' : ''}</div>
+        <div style="font-size:12px; color:#8a7a62;">${revealState.index + 1} / ${players.length} · ${statusText}</div>
+      </div>
+      <div style="margin:8px 0 4px; color:#8a8a78; font-size:12px;">底牌：</div>
+      <div style="display:flex; gap:6px; flex-wrap:wrap;">${holeHtml}</div>
+      <div style="margin:10px 0 4px; color:#8a8a78; font-size:12px;">天时牌：</div>
+      <div style="display:flex; gap:6px; flex-wrap:wrap;">${communityHtml || '<span style="color:#999;">暂无</span>'}</div>
+      <div style="margin:10px 0 4px; color:#8a8a78; font-size:12px;">最佳五张：</div>
+      <div style="display:flex; gap:6px; flex-wrap:wrap;">${bestHtml || '<span style="color:#999;">—</span>'}</div>
+      <div style="margin-top:10px;">牌型：<span style="color:#4a6a4a; font-weight:bold;">${rankName}</span></div>
+    </div>
+  `;
+
+  startRevealCountdown();
+}
+
+function nextRevealPlayer() {
+  const players = getRevealPlayers();
+  if (revealState.index >= players.length - 1) {
+    skipRevealToResult();
+    return;
+  }
+  revealState.index += 1;
+  persistCurrentSnapshot('reveal');
+  const user = getCurrentUser();
+  if (user) saveToSlot(user.userId, saveSlot + 1, saveData);
+  renderRevealCurrent();
+}
+
+function skipRevealToResult() {
+  clearRevealTimer();
+  revealState = { active: false, index: 0 };
+  saveData.status = '牌局结算';
+  persistCurrentSnapshot('result');
+  const user = getCurrentUser();
+  if (user) saveToSlot(user.userId, saveSlot + 1, saveData);
+  document.getElementById('handRevealWrap').style.display = 'none';
+  showHandResult();
 }
 
 function toggleBestHandHighlight() {
@@ -686,6 +1040,7 @@ function renderBestHandHighlight() {
 }
 
 function showHandResult() {
+  clearRevealTimer();
   const body = document.getElementById('handResultBody');
   const wrap = document.getElementById('handResultWrap');
   try {
@@ -822,17 +1177,21 @@ function showHandResult() {
     console.error('showHandResult fatal error:', e);
     body.innerHTML = '<div style="padding:10px;">牌局已结束，点击确认继续。</div>';
   }
+  document.getElementById('handRevealWrap').style.display = 'none';
   wrap.style.display = 'flex';
 }
 
 function endGame(won) {
+  clearRevealTimer();
   clearInterval(tickInterval);
   saveData.status = won ? '飞升成功' : '身死道消';
+  delete saveData.pokerSnapshot;
   const user = getCurrentUser();
   if (user) saveToSlot(user.userId, saveSlot + 1, saveData);
 
   document.getElementById('arenaWrap').style.display = 'none';
   document.getElementById('intermissionWrap').style.display = 'none';
+  document.getElementById('handRevealWrap').style.display = 'none';
   document.getElementById('handResultWrap').style.display = 'none';
   document.getElementById('endingWrap').style.display = 'flex';
 
@@ -875,6 +1234,14 @@ async function doSave(context) {
   const user = getCurrentUser();
   if (!user) return;
   if (pokerGame?.humanPlayer) saveData.chips = pokerGame.humanPlayer.chips;
+  if (context === 'arena' && pokerGame) {
+    const uiMode = document.getElementById('handRevealWrap')?.style.display === 'flex'
+      ? 'reveal'
+      : (document.getElementById('handResultWrap')?.style.display === 'flex' ? 'result' : 'arena');
+    persistCurrentSnapshot(uiMode);
+  } else if (context === 'intermission') {
+    delete saveData.pokerSnapshot;
+  }
 
   // 无论牌局内还是间歇，都弹出档位选择
   const saves = await getSaveSlots(user.userId);
@@ -934,6 +1301,13 @@ function confirmReturnMenu() {
     const user = getCurrentUser();
     if (user && pokerGame?.humanPlayer) {
       saveData.chips = pokerGame.humanPlayer.chips;
+      const inArena = document.getElementById('arenaWrap')?.style.display !== 'none';
+      const inReveal = document.getElementById('handRevealWrap')?.style.display === 'flex';
+      const inResult = document.getElementById('handResultWrap')?.style.display === 'flex';
+      if (inReveal) persistCurrentSnapshot('reveal');
+      else if (inResult) persistCurrentSnapshot('result');
+      else if (inArena && pokerGame.state !== 'idle') persistCurrentSnapshot('arena');
+      else delete saveData.pokerSnapshot;
       const now = Date.now();
       const delta = Math.floor((now - lastTickTime) / 1000);
       if (delta > 0) {

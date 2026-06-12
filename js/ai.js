@@ -168,13 +168,14 @@ function decideAction(game, player, difficulty) {
   const aggression = profile.aggression / 100;
   const bluff = profile.bluff / 100;
   const callBias = profile.callBias / 100;
+  const stack = Math.max(1, player.chips + player.currentBet);
+  const activeOpponents = game.players.filter(p => p !== player && !p.folded && !p.eliminated).length;
 
   const entryThreshold = 0.14 + tightness * 0.34;
   const callThreshold = Math.max(0.12, entryThreshold - callBias * 0.20);
   const raiseThreshold = 0.44 + tightness * 0.14 - aggression * 0.12;
 
   if (toCall >= player.chips) {
-    const activeOpponents = game.players.filter(p => p !== player && !p.folded && !p.eliminated).length;
     const multiwayPenalty = Math.min(0.12, Math.max(0, activeOpponents - 1) * 0.03);
     const allInThreshold = Math.min(0.95, (profile.allInCall / 100) + multiwayPenalty);
     return effective >= allInThreshold ? { action: 'allin' } : { action: 'fold' };
@@ -189,8 +190,19 @@ function decideAction(game, player, difficulty) {
     return { action: 'check' };
   }
 
-  const pressure = Math.min(1, toCall / Math.max(1, player.chips + player.currentBet));
-  const pressuredCallThreshold = callThreshold + pressure * (0.12 + tightness * 0.12);
+  const pressure = Math.min(1, toCall / stack);
+  const pot = Math.max(0, game.pot || 0);
+  const potOdds = toCall / Math.max(1, pot + toCall);
+  const potOddsAdjustment = (potOdds - 0.25) * 0.35;
+  const multiwayPenalty = Math.min(0.10, Math.max(0, activeOpponents - 1) * 0.025);
+  const blind = Math.max(1, game.bigBlind || 200);
+  const stackDepth = stack / blind;
+  const shortStackDiscount = stackDepth <= 8 ? 0.05 : (stackDepth <= 15 ? 0.025 : 0);
+  const pressuredCallThreshold = callThreshold
+    + pressure * (0.12 + tightness * 0.12)
+    + potOddsAdjustment
+    + multiwayPenalty
+    - shortStackDiscount;
 
   if (effective < pressuredCallThreshold) {
     const canBluffRaise = (profile.key === 'LAG' || profile.key === 'TAG' || profile.key === 'BALANCED') && pressure < 0.35;
